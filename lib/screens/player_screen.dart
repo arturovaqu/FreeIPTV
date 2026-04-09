@@ -4,7 +4,7 @@ import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:media_kit_video/media_kit_video.dart';
+import 'package:video_player/video_player.dart';
 
 import '../models/models.dart';
 import '../services/media_service.dart';
@@ -84,7 +84,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   // ── Timers ─────────────────────────────────────────────────────────────────
   Timer?  _hideTimer;
-  Timer?  _positionRestoreTimer;
   Timer?  _nextEpTimer;
   int     _nextEpCountdown  = 10;
 
@@ -157,7 +156,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _savePosition();
     _media.stop(); // stop playback so audio doesn't continue after navigation
     _hideTimer?.cancel();
-    _positionRestoreTimer?.cancel();
     _nextEpTimer?.cancel();
     _media.isBufferingNotifier.removeListener(_bufferingListener);
     _media.completedNotifier.removeListener(_completedListener);
@@ -209,35 +207,38 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     });
 
+    _startPlaybackAsync();
+  }
+
+  Future<void> _startPlaybackAsync() async {
     switch (_type) {
       case ContentType.TV:
-        _media.playChannel(widget.channel!);
+        await _media.playChannel(widget.channel!);
         return; // live TV: no position restore
       case ContentType.SERIES:
-        _media.playSeries(widget.series!, widget.season!, widget.episode!);
+        await _media.playSeries(widget.series!, widget.season!, widget.episode!);
       case ContentType.MOVIES:
-        _media.playMovie(widget.movie!);
+        await _media.playMovie(widget.movie!);
     }
 
-    // After the player has had time to open the stream, handle position.
-    _positionRestoreTimer = Timer(const Duration(milliseconds: 1500), () {
-      if (!mounted) return;
-      final explicit = widget.startPosition;
-      if (explicit != null && explicit.inSeconds > 5) {
-        // Caller already decided where to start (from detail sheet / continue tab)
-        _media.seek(explicit);
-        dev.log('[PlayerScreen] Auto-seeked to ${explicit.inSeconds}s',
-            name: 'PlayerScreen');
-      } else {
-        // Check saved progress and ask the user
-        final progress = ProgressService.instance.getProgress(_currentId);
-        if (progress != null &&
-            !progress.isCompleted &&
-            progress.position.inSeconds > 5) {
-          _showResumeDialog(progress.position);
-        }
+    if (!mounted) return;
+
+    // Controller is now initialized — handle position restore immediately.
+    final explicit = widget.startPosition;
+    if (explicit != null && explicit.inSeconds > 5) {
+      // Caller already decided where to start (from detail sheet / continue tab)
+      _media.seek(explicit);
+      dev.log('[PlayerScreen] Auto-seeked to ${explicit.inSeconds}s',
+          name: 'PlayerScreen');
+    } else {
+      // Check saved progress and ask the user
+      final progress = ProgressService.instance.getProgress(_currentId);
+      if (progress != null &&
+          !progress.isCompleted &&
+          progress.position.inSeconds > 5) {
+        _showResumeDialog(progress.position);
       }
-    });
+    }
   }
 
   void _showResumeDialog(Duration position) {
@@ -274,7 +275,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _retryPlayback() {
     setState(() => _error = null);
-    _startPlayback();
+    _startPlaybackAsync();
   }
 
   void _savePosition() {
@@ -485,7 +486,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
           children: [
             // ── 1. Video ──────────────────────────────────────────────────
             Positioned.fill(
-              child: Video(controller: _media.videoController),
+              child: ValueListenableBuilder<VideoPlayerController?>(
+                valueListenable: _media.videoControllerNotifier,
+                builder: (_, ctrl, __) {
+                  if (ctrl == null || !ctrl.value.isInitialized) {
+                    return const SizedBox.shrink();
+                  }
+                  return Center(
+                    child: AspectRatio(
+                      aspectRatio: ctrl.value.aspectRatio > 0
+                          ? ctrl.value.aspectRatio
+                          : 16 / 9,
+                      child: VideoPlayer(ctrl),
+                    ),
+                  );
+                },
+              ),
             ),
 
             // ── 2. Gesture layer ──────────────────────────────────────────

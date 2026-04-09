@@ -56,7 +56,8 @@
       "Bash(python3 -c \"import sys,json; [print\\(i[''''name''''],i[''''type''''],i.get\\(''''download_url'''',''''''''\\)\\) for i in json.load\\(sys.stdin\\)]\")",
       "Bash(python3 -c \"import sys,json; [print\\(i[''''number''''], i[''''title''''][:80]\\) for i in json.load\\(sys.stdin\\)[:10]]\")",
       "Bash(grep -r \"setProperty\\\\|NativePlayer\\\\|MPVProperty\\\\|PlayerConfiguration\" C:/Users/artur/AppData/Local/Pub/Cache/hosted/pub.dev/media_kit-1.2.6/lib --include=*.dart -l)",
-      "Bash(grep -rn \"class PlayerConfiguration\\\\|ready\\\\|VoidCallback\" C:/Users/artur/AppData/Local/Pub/Cache/hosted/pub.dev/media_kit-1.2.6/lib --include=*.dart)"
+      "Bash(grep -rn \"class PlayerConfiguration\\\\|ready\\\\|VoidCallback\" C:/Users/artur/AppData/Local/Pub/Cache/hosted/pub.dev/media_kit-1.2.6/lib --include=*.dart)",
+      "Bash(gh repo:*)"
     ]
   }
 }

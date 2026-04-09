@@ -2,15 +2,14 @@ import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:flutter/foundation.dart';
-import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
+import 'package:video_player/video_player.dart';
 
 import '../models/models.dart';
 import 'progress_service.dart';
 import 'storage_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MediaService
+// MediaService  —  ExoPlayer backend via video_player
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MediaService extends ChangeNotifier {
@@ -19,20 +18,9 @@ class MediaService extends ChangeNotifier {
 
   // ── Player ───────────────────────────────────────────────────────────────────
 
-  late final Player           _player;
-  late final VideoController  videoController;
-
-  StreamSubscription<bool>?     _playingSub;
-  StreamSubscription<Duration>? _durationSub;
-  StreamSubscription<Duration>? _positionSub;
-  StreamSubscription<bool>?     _bufferingSub;
-  StreamSubscription<String>?   _errorSub;
-  StreamSubscription<bool>?     _completedSub;
-  Timer?                        _progressTimer;
-
-  // Retry state: after a format/codec error we retry once with VLC headers
-  String? _lastUrl;
-  bool    _retryPending = false;
+  VideoPlayerController? _controller;
+  Timer?                 _progressTimer;
+  Timer?                 _positionPollTimer;
 
   // ── State ───────────────────────────────────────────────────────────────────
 
@@ -51,6 +39,8 @@ class MediaService extends ChangeNotifier {
 
   // ── ValueNotifiers ──────────────────────────────────────────────────────────
 
+  /// Fires whenever a new VideoPlayerController is ready for rendering.
+  final videoControllerNotifier   = ValueNotifier<VideoPlayerController?>(null);
   final isPlayingNotifier          = ValueNotifier<bool>(false);
   final currentContentTypeNotifier = ValueNotifier<ContentType?>(null);
   final currentChannelNotifier     = ValueNotifier<Channel?>(null);
@@ -67,20 +57,20 @@ class MediaService extends ChangeNotifier {
 
   // ── Getters ──────────────────────────────────────────────────────────────────
 
-  bool         get isPlaying          => _isPlaying;
-  ContentType? get currentContentType => _currentContentType;
-  Channel?     get currentChannel     => _currentChannel;
-  Series?      get currentSeries      => _currentSeries;
-  Season?      get currentSeason      => _currentSeason;
-  Episode?     get currentEpisode     => _currentEpisode;
-  Movie?       get currentMovie       => _currentMovie;
-  Duration     get duration           => _duration;
-  Duration     get position           => _position;
-  double       get volume             => _volume;
-  String?      get error              => _error;
-  bool         get subtitlesEnabled   => _subtitlesEnabled;
+  bool                   get isPlaying          => _isPlaying;
+  ContentType?           get currentContentType => _currentContentType;
+  Channel?               get currentChannel     => _currentChannel;
+  Series?                get currentSeries      => _currentSeries;
+  Season?                get currentSeason      => _currentSeason;
+  Episode?               get currentEpisode     => _currentEpisode;
+  Movie?                 get currentMovie       => _currentMovie;
+  Duration               get duration           => _duration;
+  Duration               get position           => _position;
+  double                 get volume             => _volume;
+  String?                get error              => _error;
+  bool                   get subtitlesEnabled   => _subtitlesEnabled;
+  VideoPlayerController? get videoController    => _controller;
 
-  /// Progress 0.0–1.0, or 0 if duration is zero.
   double get progress =>
       _duration.inMilliseconds > 0
           ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
@@ -89,204 +79,177 @@ class MediaService extends ChangeNotifier {
   // ── Init ─────────────────────────────────────────────────────────────────────
 
   Future<void> initialize() async {
-    MediaKit.ensureInitialized();
-    _player = Player(
-      configuration: PlayerConfiguration(
-        // ready() fires once the internal mpv context is fully initialized.
-        // This is the only safe moment to call setProperty(); calling it
-        // earlier (right after Player()) crashes because the mpv handle
-        // doesn't exist yet.
-        ready: _applyMkvFix,
-      ),
-    );
-    videoController = VideoController(_player);
-    _subscribeToStreams();
-    dev.log('[MediaService] Initialized', name: 'MediaService');
-  }
-
-  /// Configures libmpv for reliable MKV playback over HTTP.
-  ///
-  /// Root cause of "Failed to recognize file format":
-  ///   - mpv's native EBML/Matroska demuxer has a parser bug (mpv #15691)
-  ///     that misidentifies certain MKV streams served over HTTP.
-  ///   - Fix: force FFmpeg's lavf demuxer (+lavf), which handles Matroska
-  ///     correctly and is the same code path used by VLC.
-  ///   - Increase probe size/duration so slow IPTV servers have enough time
-  ///     to deliver sufficient data for format detection.
-  void _applyMkvFix() {
-    if (_player.platform is! NativePlayer) return;
-    final native = _player.platform as NativePlayer;
-    // Errors are swallowed — a failed property set must never crash the app.
-    native.setProperty('demuxer', '+lavf').catchError((_) {});
-    native.setProperty('demuxer-lavf-probesize', '8388608').catchError((_) {});
-    native.setProperty('demuxer-lavf-analyzeduration', '10').catchError((_) {});
-    native.setProperty('hwdec', 'auto-safe').catchError((_) {});
-    dev.log('[MediaService] MKV fix applied (lavf demuxer, 8 MB probe)',
+    dev.log('[MediaService] Initialized — backend: ExoPlayer (video_player)',
         name: 'MediaService');
   }
 
-  void _subscribeToStreams() {
-    _playingSub = _player.stream.playing.listen((playing) {
-      if (_isPlaying != playing) {
-        _isPlaying = playing;
-        isPlayingNotifier.value = playing;
-        notifyListeners();
-      }
-    });
+  // ── HTTP headers ─────────────────────────────────────────────────────────────
 
-    _durationSub = _player.stream.duration.listen((dur) {
-      if (_duration != dur) {
-        _duration = dur;
-        durationNotifier.value = dur;
-        notifyListeners();
-      }
-    });
-
-    _positionSub = _player.stream.position.listen((pos) {
-      if (_position != pos) {
-        _position = pos;
-        positionNotifier.value = pos;
-        // position fires too often — no notifyListeners()
-      }
-    });
-
-    _bufferingSub = _player.stream.buffering.listen((buffering) {
-      if (isBufferingNotifier.value != buffering) {
-        isBufferingNotifier.value = buffering;
-      }
-    });
-
-    _errorSub = _player.stream.error.listen((errStr) {
-      if (errStr.isEmpty || _error == errStr) return;
-
-      _error = errStr;
-      errorNotifier.value = errStr;
-      dev.log('[MediaService] Video error: $errStr — URL: $_lastUrl',
-          name: 'MediaService');
-
-      // Detect format/codec errors and retry once with VLC headers.
-      // These errors come from libmpv and typically mean the server is blocking
-      // the Chrome UA or the stream needs a plain HTTP range request.
-      final lower = errStr.toLowerCase();
-      final isFormatError = lower.contains('format') ||
-          lower.contains('codec') ||
-          lower.contains('recognized') ||
-          lower.contains('invalid data') ||
-          lower.contains('failed to open');
-
-      if (isFormatError && !_retryPending && _lastUrl != null) {
-        _retryPending = true;
-        dev.log('[MediaService] Format/codec error detectado — '
-            'reintentando con VLC User-Agent...',
-            name: 'MediaService');
-        _retryWithVlcHeaders();
-      } else {
-        notifyListeners();
-      }
-    });
-
-    _completedSub = _player.stream.completed.listen((completed) {
-      if (completed && !completedNotifier.value) {
-        completedNotifier.value = true;
-        dev.log('[MediaService] Playback completed', name: 'MediaService');
-        _onPlaybackCompleted();
-      }
-    });
-  }
-
-  // ── Open URL ─────────────────────────────────────────────────────────────────
-
-  // Primary headers — Chrome UA, used for live TV and series on first attempt
-  static const _fullHeaders = <String, String>{
+  // Live TV / series — Chrome UA for maximum compatibility with IPTV servers
+  static const _tvHeaders = <String, String>{
     'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
         '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Referer': 'http://iota.proxy-pass.vip/',
-    'Origin': 'http://iota.proxy-pass.vip',
-    'Accept': '*/*',
+    'Referer':        'http://iota.proxy-pass.vip/',
+    'Origin':         'http://iota.proxy-pass.vip',
+    'Accept':         '*/*',
     'Accept-Language': 'es-ES,es;q=0.9',
-    'Accept-Encoding': 'gzip, deflate',
-    'Cache-Control': 'no-cache',
-    'Pragma': 'no-cache',
-    'Connection': 'keep-alive',
+    'Cache-Control':  'no-cache',
+    'Pragma':         'no-cache',
+    'Connection':     'keep-alive',
   };
 
-  // Movie headers — VLC UA + Range from the start.
-  // MKV files require an HTTP Range request so libmpv can probe the container
-  // format correctly; without it the server may return a partial/chunked
-  // response that libmpv cannot recognize ("Failed to recognize file format").
+  // Movies — VLC UA; many IPTV backends gate VOD behind UA checks
   static const _movieHeaders = <String, String>{
     'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
     'Connection': 'keep-alive',
-    'Range': 'bytes=0-',
   };
 
-  // Fallback headers — VLC UA + Range, used when first attempt reports a
-  // format/codec error (many IPTV providers gate content behind UA detection).
-  static const _vlcHeaders = <String, String>{
-    'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
-    'Connection': 'keep-alive',
-    'Range': 'bytes=0-',
-  };
+  // ── Open URL ─────────────────────────────────────────────────────────────────
 
+  /// Opens [url] in a brand-new VideoPlayerController.
+  ///
+  /// Returns normally when the controller has been initialized and playback
+  /// started.  Throws / sets error state on failure.
   Future<void> _openUrl(String url) async {
-    _lastUrl      = url;
-    _retryPending = false;
+    _cancelProgressTimer();
+    _cancelPositionPollTimer();
     _clearError();
-    completedNotifier.value        = false;
-    isBufferingNotifier.value      = false;
-    _subtitlesEnabled              = false;
-    subtitlesEnabledNotifier.value = false;
+    completedNotifier.value   = false;
+    isBufferingNotifier.value = true;
 
-    // Movies (typically MKV) need Range: bytes=0- from the first request so
-    // libmpv can seek to the moov atom and identify the container format.
     final headers = _currentContentType == ContentType.MOVIES
         ? _movieHeaders
-        : _fullHeaders;
+        : _tvHeaders;
 
-    dev.log('[MediaService] Intentando reproducir: $url', name: 'MediaService');
-    dev.log('[MediaService] Tipo de contenido: $_currentContentType — '
-        'headers: ${_currentContentType == ContentType.MOVIES ? "movie" : "full"}',
+    dev.log('[MediaService] Opening: $url', name: 'MediaService');
+    dev.log('[MediaService] Type: $_currentContentType  '
+        'headers: ${_currentContentType == ContentType.MOVIES ? "movie/VLC" : "tv/Chrome"}',
         name: 'MediaService');
     // ignore: avoid_print
-    print('=== URL PELÍCULA === $url');
+    print('=== MEDIA URL  === $url');
     // ignore: avoid_print
-    print('=== TIPO ========== $_currentContentType');
+    print('=== MEDIA TYPE === $_currentContentType');
+
+    final newCtrl = VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      httpHeaders: headers,
+    );
 
     try {
-      await _player.open(Media(url, httpHeaders: headers));
-      // Subtitles off by default; user can enable via toggleSubtitles().
-      await _player.setSubtitleTrack(SubtitleTrack.no());
+      await newCtrl.initialize();
+      dev.log('[MediaService] ExoPlayer initialized OK — '
+          'duration: ${newCtrl.value.duration}', name: 'MediaService');
+
+      final oldCtrl = _controller;
+
+      // Swap to the new controller before exposing it to the UI
+      _controller = newCtrl;
+      _duration   = newCtrl.value.duration;
+      _position   = Duration.zero;
+
+      durationNotifier.value = _duration;
+      positionNotifier.value = Duration.zero;
+
+      newCtrl.addListener(_onControllerUpdate);
+      await newCtrl.setVolume(_volume / 100.0);
+      await newCtrl.play();
+
+      // Publish AFTER play() so the VideoPlayer widget gets an already-playing
+      // controller and renders the first frame immediately.
+      videoControllerNotifier.value = newCtrl;
+
+      isBufferingNotifier.value = false;
+      _startPositionPollTimer();
+
+      // Dispose old controller after the new one is live
+      if (oldCtrl != null) {
+        oldCtrl.removeListener(_onControllerUpdate);
+        oldCtrl.dispose();
+      }
     } catch (e) {
-      dev.log('[MediaService] Error al abrir stream: $e', name: 'MediaService');
-      _setError('No se pudo abrir el stream. Comprueba la URL o la conexión.');
+      dev.log('[MediaService] Error opening stream: $e', name: 'MediaService');
+      newCtrl.dispose();
+      isBufferingNotifier.value = false;
+      _setError('No se pudo abrir el stream.\n$e');
     }
   }
 
-  /// Retries [_lastUrl] with VLC headers after a format/codec error.
-  Future<void> _retryWithVlcHeaders() async {
-    final url = _lastUrl;
-    if (url == null) return;
-    _clearError();
-    dev.log('[MediaService] Reintentando con VLC headers: $url',
-        name: 'MediaService');
-    try {
-      await _player.open(Media(url, httpHeaders: _vlcHeaders));
-      await _player.setSubtitleTrack(SubtitleTrack.no());
-      dev.log('[MediaService] Reintento exitoso: $url', name: 'MediaService');
-    } catch (e) {
-      dev.log('[MediaService] Reintento también falló: $e',
-          name: 'MediaService');
-      _retryPending = false;
-      _setError('Formato no soportado o stream caído.');
+  // ── Controller listener ───────────────────────────────────────────────────────
+
+  void _onControllerUpdate() {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    final val = ctrl.value;
+
+    // Playing state
+    if (_isPlaying != val.isPlaying) {
+      _isPlaying = val.isPlaying;
+      isPlayingNotifier.value = val.isPlaying;
+      notifyListeners();
     }
+
+    // Buffering
+    if (isBufferingNotifier.value != val.isBuffering) {
+      isBufferingNotifier.value = val.isBuffering;
+    }
+
+    // Error
+    if (val.hasError) {
+      final msg = val.errorDescription ?? 'Error desconocido';
+      if (_error != msg) {
+        _error = msg;
+        errorNotifier.value = msg;
+        dev.log('[MediaService] Video error: $msg', name: 'MediaService');
+        notifyListeners();
+      }
+    }
+
+    // Duration (can arrive late for some streams)
+    if (val.duration > Duration.zero && _duration != val.duration) {
+      _duration = val.duration;
+      durationNotifier.value = val.duration;
+    }
+
+    // Completion: within last 2 s and paused/stopped
+    if (!completedNotifier.value &&
+        _duration > Duration.zero &&
+        val.position >= _duration - const Duration(seconds: 2) &&
+        !val.isPlaying) {
+      completedNotifier.value = true;
+      _onPlaybackCompleted();
+    }
+  }
+
+  // ── Position poll ─────────────────────────────────────────────────────────────
+  //
+  // video_player has no position stream; we poll every 500 ms instead.
+
+  void _startPositionPollTimer() {
+    _cancelPositionPollTimer();
+    _positionPollTimer = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) {
+        final ctrl = _controller;
+        if (ctrl == null || !ctrl.value.isInitialized) return;
+        final pos = ctrl.value.position;
+        if (_position != pos) {
+          _position = pos;
+          positionNotifier.value = pos;
+        }
+      },
+    );
+  }
+
+  void _cancelPositionPollTimer() {
+    _positionPollTimer?.cancel();
+    _positionPollTimer = null;
   }
 
   // ── Playback commands ────────────────────────────────────────────────────────
 
   Future<void> playChannel(Channel ch) async {
     dev.log('[MediaService] playChannel: ${ch.name}', name: 'MediaService');
-    _cancelProgressTimer();
     _currentContentType = ContentType.TV;
     _currentChannel     = ch;
     _currentSeries      = null;
@@ -294,17 +257,15 @@ class MediaService extends ChangeNotifier {
     _currentEpisode     = null;
     _currentMovie       = null;
     _updateContentNotifiers();
-
     await _openUrl(ch.url);
-
     StorageService.instance.addToHistory(ch.id, ContentType.TV);
     notifyListeners();
   }
 
   Future<void> playSeries(Series s, Season season, Episode ep) async {
-    dev.log('[MediaService] playSeries: ${s.name} S${season.seasonNumber}E${ep.episodeNumber}',
+    dev.log('[MediaService] playSeries: ${s.name} '
+        'S${season.seasonNumber}E${ep.episodeNumber}',
         name: 'MediaService');
-    _cancelProgressTimer();
     _currentContentType = ContentType.SERIES;
     _currentSeries      = s;
     _currentSeason      = season;
@@ -312,9 +273,7 @@ class MediaService extends ChangeNotifier {
     _currentChannel     = null;
     _currentMovie       = null;
     _updateContentNotifiers();
-
     await _openUrl(ep.url);
-
     StorageService.instance.addToHistory(
       '${s.id}_S${season.seasonNumber}E${ep.episodeNumber}',
       ContentType.SERIES,
@@ -325,7 +284,6 @@ class MediaService extends ChangeNotifier {
 
   Future<void> playMovie(Movie m) async {
     dev.log('[MediaService] playMovie: ${m.title}', name: 'MediaService');
-    _cancelProgressTimer();
     _currentContentType = ContentType.MOVIES;
     _currentMovie       = m;
     _currentChannel     = null;
@@ -333,9 +291,7 @@ class MediaService extends ChangeNotifier {
     _currentSeason      = null;
     _currentEpisode     = null;
     _updateContentNotifiers();
-
     await _openUrl(m.url);
-
     StorageService.instance.addToHistory(m.id, ContentType.MOVIES);
     _startProgressTimer();
     notifyListeners();
@@ -343,7 +299,6 @@ class MediaService extends ChangeNotifier {
 
   // ── Episode navigation ────────────────────────────────────────────────────────
 
-  /// Returns true if there was a next episode to play.
   Future<bool> playNextEpisode() async {
     final series  = _currentSeries;
     final season  = _currentSeason;
@@ -359,18 +314,17 @@ class MediaService extends ChangeNotifier {
 
     final sIdx = series.seasons.indexOf(season);
     if (sIdx < series.seasons.length - 1) {
-      final nextSeason = series.seasons[sIdx + 1];
-      if (nextSeason.episodes.isNotEmpty) {
-        await playSeries(series, nextSeason, nextSeason.episodes.first);
+      final next = series.seasons[sIdx + 1];
+      if (next.episodes.isNotEmpty) {
+        await playSeries(series, next, next.episodes.first);
         return true;
       }
     }
 
-    dev.log('[MediaService] No next episode available', name: 'MediaService');
+    dev.log('[MediaService] No next episode', name: 'MediaService');
     return false;
   }
 
-  /// Returns true if there was a previous episode to play.
   Future<bool> playPreviousEpisode() async {
     final series  = _currentSeries;
     final season  = _currentSeason;
@@ -386,14 +340,14 @@ class MediaService extends ChangeNotifier {
 
     final sIdx = series.seasons.indexOf(season);
     if (sIdx > 0) {
-      final prevSeason = series.seasons[sIdx - 1];
-      if (prevSeason.episodes.isNotEmpty) {
-        await playSeries(series, prevSeason, prevSeason.episodes.last);
+      final prev = series.seasons[sIdx - 1];
+      if (prev.episodes.isNotEmpty) {
+        await playSeries(series, prev, prev.episodes.last);
         return true;
       }
     }
 
-    dev.log('[MediaService] No previous episode available', name: 'MediaService');
+    dev.log('[MediaService] No previous episode', name: 'MediaService');
     return false;
   }
 
@@ -401,27 +355,25 @@ class MediaService extends ChangeNotifier {
 
   Future<void> playNextChannel(List<Channel> channels) async {
     if (channels.isEmpty) return;
-    final ch = _currentChannel;
+    final ch  = _currentChannel;
     if (ch == null) { await playChannel(channels.first); return; }
     final idx  = channels.indexWhere((c) => c.id == ch.id);
-    final next = channels[(idx + 1) % channels.length];
-    await playChannel(next);
+    await playChannel(channels[(idx + 1) % channels.length]);
   }
 
   Future<void> playPreviousChannel(List<Channel> channels) async {
     if (channels.isEmpty) return;
-    final ch = _currentChannel;
+    final ch  = _currentChannel;
     if (ch == null) { await playChannel(channels.last); return; }
     final idx  = channels.indexWhere((c) => c.id == ch.id);
-    final prev = channels[(idx - 1 + channels.length) % channels.length];
-    await playChannel(prev);
+    await playChannel(channels[(idx - 1 + channels.length) % channels.length]);
   }
 
   // ── Playback controls ────────────────────────────────────────────────────────
 
   Future<void> play() async {
     try {
-      await _player.play();
+      await _controller?.play();
     } catch (e) {
       _setError('Error al reproducir: $e');
     }
@@ -429,7 +381,7 @@ class MediaService extends ChangeNotifier {
 
   Future<void> pause() async {
     try {
-      await _player.pause();
+      await _controller?.pause();
     } catch (e) {
       _setError('Error al pausar: $e');
     }
@@ -437,9 +389,10 @@ class MediaService extends ChangeNotifier {
 
   Future<void> stop() async {
     _cancelProgressTimer();
+    _cancelPositionPollTimer();
     try {
-      await _player.pause();
-      await _player.seek(Duration.zero);
+      await _controller?.pause();
+      await _controller?.seekTo(Duration.zero);
     } catch (e) {
       _setError('Error al detener: $e');
     }
@@ -447,37 +400,31 @@ class MediaService extends ChangeNotifier {
 
   Future<void> seek(Duration position) async {
     try {
-      await _player.seek(position);
+      await _controller?.seekTo(position);
     } catch (e) {
       dev.log('[MediaService] Seek error: $e', name: 'MediaService');
     }
   }
 
-  /// Volume in 0–100 range.
+  /// Volume in 0–100 range (consistent with previous media_kit API).
   Future<void> setVolume(double volume) async {
     final clamped = volume.clamp(0.0, 100.0);
     _volume = clamped;
     volumeNotifier.value = clamped;
     try {
-      await _player.setVolume(clamped);
+      // video_player uses 0.0–1.0
+      await _controller?.setVolume(clamped / 100.0);
     } catch (e) {
       dev.log('[MediaService] Volume error: $e', name: 'MediaService');
     }
   }
 
-  /// Toggles subtitles on/off. For VOD content only; live TV has no subtitles.
+  /// Subtitle toggle — ExoPlayer renders embedded MKV subs automatically.
+  /// video_player doesn't expose track selection, so this only updates the
+  /// UI indicator.
   Future<void> toggleSubtitles() async {
     _subtitlesEnabled = !_subtitlesEnabled;
     subtitlesEnabledNotifier.value = _subtitlesEnabled;
-    try {
-      await _player.setSubtitleTrack(
-        _subtitlesEnabled ? SubtitleTrack.auto() : SubtitleTrack.no(),
-      );
-      dev.log('[MediaService] Subtítulos: ${_subtitlesEnabled ? "ON" : "OFF"}',
-          name: 'MediaService');
-    } catch (e) {
-      dev.log('[MediaService] Subtitle toggle error: $e', name: 'MediaService');
-    }
   }
 
   // ── Progress timer ───────────────────────────────────────────────────────────
@@ -511,10 +458,9 @@ class MediaService extends ChangeNotifier {
         _currentSeries  != null &&
         _currentSeason  != null &&
         _currentEpisode != null) {
-      final contentId =
-          '${_currentSeries!.id}_S${_currentSeason!.seasonNumber}E${_currentEpisode!.episodeNumber}';
       ProgressService.instance.saveProgress(
-        contentId:     contentId,
+        contentId:     '${_currentSeries!.id}_S${_currentSeason!.seasonNumber}'
+            'E${_currentEpisode!.episodeNumber}',
         contentType:   ContentType.SERIES,
         position:      _position,
         duration:      _duration > Duration.zero ? _duration : null,
@@ -534,9 +480,10 @@ class MediaService extends ChangeNotifier {
     final id = switch (type) {
       ContentType.TV     => _currentChannel?.id,
       ContentType.SERIES => _currentSeries != null &&
-              _currentSeason != null &&
+              _currentSeason  != null &&
               _currentEpisode != null
-          ? '${_currentSeries!.id}_S${_currentSeason!.seasonNumber}E${_currentEpisode!.episodeNumber}'
+          ? '${_currentSeries!.id}_S${_currentSeason!.seasonNumber}'
+              'E${_currentEpisode!.episodeNumber}'
           : null,
       ContentType.MOVIES => _currentMovie?.id,
     };
@@ -576,7 +523,7 @@ class MediaService extends ChangeNotifier {
 
   void _onPlaybackCompleted() {
     _cancelProgressTimer();
-    // Mark progress as completed so "Continuar viendo" won't show this item.
+    _cancelPositionPollTimer();
     final type = _currentContentType;
     if (type == ContentType.MOVIES && _currentMovie != null) {
       ProgressService.instance.markAsCompleted(_currentMovie!.id);
@@ -585,7 +532,8 @@ class MediaService extends ChangeNotifier {
         _currentSeason  != null &&
         _currentEpisode != null) {
       ProgressService.instance.markAsCompleted(
-        '${_currentSeries!.id}_S${_currentSeason!.seasonNumber}E${_currentEpisode!.episodeNumber}',
+        '${_currentSeries!.id}_S${_currentSeason!.seasonNumber}'
+        'E${_currentEpisode!.episodeNumber}',
       );
       playNextEpisode();
     }
@@ -598,16 +546,12 @@ class MediaService extends ChangeNotifier {
     savePosition();
     _saveCurrentProgress();
     _cancelProgressTimer();
+    _cancelPositionPollTimer();
 
-    _playingSub?.cancel();
-    _durationSub?.cancel();
-    _positionSub?.cancel();
-    _bufferingSub?.cancel();
-    _errorSub?.cancel();
-    _completedSub?.cancel();
+    _controller?.removeListener(_onControllerUpdate);
+    _controller?.dispose();
 
-    _player.dispose();
-
+    videoControllerNotifier.dispose();
     isPlayingNotifier.dispose();
     currentContentTypeNotifier.dispose();
     currentChannelNotifier.dispose();

@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Keep screen on during playback -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <permission
         android:name="com.example.iptv_app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
@@ -25,7 +26,8 @@
         android:extractNativeLibs="true"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="IPTV App" >
+        android:label="IPTV App"
+        android:usesCleartextTraffic="true" >
         <activity
             android:name="com.example.iptv_app.MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
