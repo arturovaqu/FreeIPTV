@@ -112,54 +112,62 @@ class MediaService extends ChangeNotifier {
     completedNotifier.value   = false;
     isBufferingNotifier.value = true;
 
-    dev.log('[MediaService] Opening: $url', name: 'MediaService');
+    // Encode URL to handle spaces and special characters
+    final safeUrl = Uri.encodeFull(url);
+
+    dev.log('[MediaService] Opening: $safeUrl', name: 'MediaService');
     dev.log('[MediaService] Type: $_currentContentType', name: 'MediaService');
     // ignore: avoid_print
-    print('=== MEDIA URL  === $url');
+    print('=== MEDIA URL  === $safeUrl');
     // ignore: avoid_print
     print('=== MEDIA TYPE === $_currentContentType');
 
-    final newCtrl = VideoPlayerController.networkUrl(
-      Uri.parse(url),
-      httpHeaders: _headers,
-    );
+    // Attempt 1: with Chrome UA headers
+    // Attempt 2: no headers (some servers block specific UA for certain categories)
+    final attempts = [_headers, <String, String>{}];
 
-    try {
-      await newCtrl.initialize();
-      dev.log('[MediaService] ExoPlayer initialized OK — '
-          'duration: ${newCtrl.value.duration}', name: 'MediaService');
+    for (int attempt = 0; attempt < attempts.length; attempt++) {
+      final ctrl = VideoPlayerController.networkUrl(
+        Uri.parse(safeUrl),
+        httpHeaders: attempts[attempt],
+      );
 
-      final oldCtrl = _controller;
+      try {
+        await ctrl.initialize();
+        dev.log('[MediaService] ExoPlayer OK (attempt ${attempt + 1}) — '
+            'duration: ${ctrl.value.duration}', name: 'MediaService');
 
-      // Swap to the new controller before exposing it to the UI
-      _controller = newCtrl;
-      _duration   = newCtrl.value.duration;
-      _position   = Duration.zero;
+        final oldCtrl = _controller;
+        _controller = ctrl;
+        _duration   = ctrl.value.duration;
+        _position   = Duration.zero;
 
-      durationNotifier.value = _duration;
-      positionNotifier.value = Duration.zero;
+        durationNotifier.value = _duration;
+        positionNotifier.value = Duration.zero;
 
-      newCtrl.addListener(_onControllerUpdate);
-      await newCtrl.setVolume(_volume / 100.0);
-      await newCtrl.play();
+        ctrl.addListener(_onControllerUpdate);
+        await ctrl.setVolume(_volume / 100.0);
+        await ctrl.play();
 
-      // Publish AFTER play() so the VideoPlayer widget gets an already-playing
-      // controller and renders the first frame immediately.
-      videoControllerNotifier.value = newCtrl;
+        videoControllerNotifier.value = ctrl;
+        isBufferingNotifier.value = false;
+        _startPositionPollTimer();
 
-      isBufferingNotifier.value = false;
-      _startPositionPollTimer();
-
-      // Dispose old controller after the new one is live
-      if (oldCtrl != null) {
-        oldCtrl.removeListener(_onControllerUpdate);
-        oldCtrl.dispose();
+        if (oldCtrl != null) {
+          oldCtrl.removeListener(_onControllerUpdate);
+          oldCtrl.dispose();
+        }
+        return; // success — stop trying
+      } catch (e) {
+        ctrl.dispose();
+        dev.log('[MediaService] Attempt ${attempt + 1} failed: $e',
+            name: 'MediaService');
+        if (attempt == attempts.length - 1) {
+          // All attempts exhausted
+          isBufferingNotifier.value = false;
+          _setError('No se pudo abrir el stream.\nURL: $safeUrl\n$e');
+        }
       }
-    } catch (e) {
-      dev.log('[MediaService] Error opening stream: $e', name: 'MediaService');
-      newCtrl.dispose();
-      isBufferingNotifier.value = false;
-      _setError('No se pudo abrir el stream.\n$e');
     }
   }
 
