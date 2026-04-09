@@ -85,8 +85,8 @@ class MediaService extends ChangeNotifier {
 
   // ── HTTP headers ─────────────────────────────────────────────────────────────
 
-  // Live TV / series — Chrome UA for maximum compatibility with IPTV servers
-  static const _tvHeaders = <String, String>{
+  // All content types — same Chrome UA that works for live TV and series
+  static const _headers = <String, String>{
     'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
         '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -97,12 +97,6 @@ class MediaService extends ChangeNotifier {
     'Cache-Control':  'no-cache',
     'Pragma':         'no-cache',
     'Connection':     'keep-alive',
-  };
-
-  // Movies — VLC UA; many IPTV backends gate VOD behind UA checks
-  static const _movieHeaders = <String, String>{
-    'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
-    'Connection': 'keep-alive',
   };
 
   // ── Open URL ─────────────────────────────────────────────────────────────────
@@ -118,14 +112,8 @@ class MediaService extends ChangeNotifier {
     completedNotifier.value   = false;
     isBufferingNotifier.value = true;
 
-    final headers = _currentContentType == ContentType.MOVIES
-        ? _movieHeaders
-        : _tvHeaders;
-
     dev.log('[MediaService] Opening: $url', name: 'MediaService');
-    dev.log('[MediaService] Type: $_currentContentType  '
-        'headers: ${_currentContentType == ContentType.MOVIES ? "movie/VLC" : "tv/Chrome"}',
-        name: 'MediaService');
+    dev.log('[MediaService] Type: $_currentContentType', name: 'MediaService');
     // ignore: avoid_print
     print('=== MEDIA URL  === $url');
     // ignore: avoid_print
@@ -133,7 +121,7 @@ class MediaService extends ChangeNotifier {
 
     final newCtrl = VideoPlayerController.networkUrl(
       Uri.parse(url),
-      httpHeaders: headers,
+      httpHeaders: _headers,
     );
 
     try {
