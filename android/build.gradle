@@ -1,0 +1,31 @@
+// Top-level build file — options common to all sub-projects/modules.
+// With the new Flutter plugin loader (flutter-plugin-loader 1.0.0),
+// plugin declarations live in settings.gradle, so this file stays minimal.
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    // On Windows, Gradle cannot compute relative paths between files on different
+    // drives (e.g. project on D: and pub-cache plugins on C:).  When the plugin
+    // source lives on a different drive from the root build dir, keep the plugin
+    // build dir on the *same drive as the plugin source* to avoid the error:
+    //   "this and base files have different roots"
+    def rootDrive  = rootProject.buildDir.absolutePath.take(2).toLowerCase()
+    def subDrive   = project.projectDir.absolutePath.take(2).toLowerCase()
+    if (subDrive != rootDrive) {
+        project.buildDir = "${project.projectDir}/build"
+    } else {
+        project.buildDir = "${rootProject.buildDir}/${project.name}"
+    }
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
