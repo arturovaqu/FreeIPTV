@@ -1,0 +1,28 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.example.iptv_app-mergeReleaseResources-29:/values-night-v8/values-night-v8.xml",
+            "map": [
+                {
+                    "source": "D:\\PERSONAL\\Dinero\\IPTV\\android\\app\\src\\main\\res\\values-night\\styles.xml",
+                    "from": {
+                        "startLines": "3,6",
+                        "startColumns": "4,4",
+                        "startOffsets": "131,303",
+                        "endLines": "5,8",
+                        "endColumns": "12,12",
+                        "endOffsets": "298,467"
+                    },
+                    "to": {
+                        "startLines": "2,5",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,227",
+                        "endLines": "4,7",
+                        "endColumns": "12,12",
+                        "endOffsets": "222,391"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,1 @@
+ D:\\PERSONAL\\Dinero\\IPTV\\.dart_tool\\flutter_build\\c57ce7cfdcf623410442d145355e01eb\\native_assets.yaml: 
