@@ -11,6 +11,7 @@ import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
 import '../widgets/tv_focus_manager.dart';
+import '../widgets/tv_text_field.dart';
 import 'player_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -254,28 +255,11 @@ class _MoviesListScreenState extends State<MoviesListScreen>
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: TextField(
+          child: TvTextField(
             controller: _searchCtrl,
-            style: AppTextStyles.bodyLarge,
-            decoration: InputDecoration(
-              hintText: 'Buscar película...',
-              hintStyle: AppTextStyles.bodyMedium,
-              prefixIcon: const Icon(Icons.search,
-                  color: AppColors.textSecondary, size: 20),
-              suffixIcon: _query.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear,
-                          color: AppColors.textSecondary, size: 18),
-                      onPressed: () => _searchCtrl.clear())
-                  : null,
-              filled: true,
-              fillColor: AppColors.surfaceVariant,
-              contentPadding: const EdgeInsets.symmetric(
-                  vertical: AppSpacing.sm, horizontal: AppSpacing.base),
-              border: _border(),
-              enabledBorder: _border(),
-              focusedBorder: _border(color: AppColors.accent, width: 2),
-            ),
+            hintText: 'Buscar película...',
+            prefixIcon: const Icon(Icons.search,
+                color: AppColors.textSecondary, size: 20),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -339,12 +323,6 @@ class _MoviesListScreenState extends State<MoviesListScreen>
     );
   }
 
-  static OutlineInputBorder _border(
-          {Color color = AppColors.border, double width = 1}) =>
-      OutlineInputBorder(
-        borderRadius: AppRadius.buttonRadius,
-        borderSide: BorderSide(color: color, width: width),
-      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

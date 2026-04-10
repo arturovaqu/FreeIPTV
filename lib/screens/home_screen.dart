@@ -8,6 +8,7 @@ import '../services/m3u_parser.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
+import '../widgets/tv_text_field.dart';
 import 'favorites_screen.dart';
 import 'history_screen.dart';
 import 'movies_list_screen.dart';
@@ -453,8 +454,6 @@ class _AddPlaylistDialog extends StatefulWidget {
 class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
   late final TextEditingController _urlCtrl;
   late final TextEditingController _nameCtrl;
-  late final FocusNode _urlFocus;
-  late final FocusNode _nameFocus;
   _InputMode _mode = _InputMode.manual;
   bool        _loading = false;
   String?     _error;
@@ -464,12 +463,6 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
     super.initState();
     _urlCtrl  = TextEditingController(text: widget.prefillUrl);
     _nameCtrl = TextEditingController(text: widget.prefillName);
-    _urlFocus  = FocusNode();
-    _nameFocus = FocusNode();
-
-    // Invoke the TV soft keyboard whenever a field gains focus.
-    _urlFocus.addListener(_showImeOnFocus(_urlFocus));
-    _nameFocus.addListener(_showImeOnFocus(_nameFocus));
 
     // Auto-submit when the dialog is opened with a pre-filled URL from QR scan.
     if (widget.prefillUrl.isNotEmpty) {
@@ -479,19 +472,10 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
     }
   }
 
-  /// Returns a listener that calls TextInput.show when [node] gains focus.
-  VoidCallback _showImeOnFocus(FocusNode node) => () {
-    if (node.hasFocus) {
-      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-    }
-  };
-
   @override
   void dispose() {
     _urlCtrl.dispose();
     _nameCtrl.dispose();
-    _urlFocus.dispose();
-    _nameFocus.dispose();
     super.dispose();
   }
 
@@ -563,20 +547,21 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
 
             // ── Manual form ────────────────────────────────────────────────
             if (_mode == _InputMode.manual) ...[
-              _StyledTextField(
+              TvTextField(
                 controller: _urlCtrl,
-                hint: 'URL M3U (http://...)',
+                hintText: 'URL M3U (http://...)',
                 enabled: !_loading,
                 keyboardType: TextInputType.url,
-                focusNode: _urlFocus,
-                autofocus: true,
+                prefixIcon: const Icon(Icons.link,
+                    color: AppColors.textSecondary, size: 20),
               ),
               const SizedBox(height: AppSpacing.md),
-              _StyledTextField(
+              TvTextField(
                 controller: _nameCtrl,
-                hint: 'Nombre (opcional)',
+                hintText: 'Nombre (opcional)',
                 enabled: !_loading,
-                focusNode: _nameFocus,
+                prefixIcon: const Icon(Icons.label_outline,
+                    color: AppColors.textSecondary, size: 20),
               ),
             ],
 
@@ -1034,28 +1019,17 @@ class _PlaylistTile extends StatelessWidget {
 class _StyledTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
-  final bool enabled;
-  final TextInputType? keyboardType;
-  final FocusNode? focusNode;
-  final bool autofocus;
 
   const _StyledTextField({
     required this.controller,
     required this.hint,
-    this.enabled = true,
-    this.keyboardType,
-    this.focusNode,
-    this.autofocus = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      enabled: enabled,
-      keyboardType: keyboardType,
-      focusNode: focusNode,
-      autofocus: autofocus,
+      autofocus: true,
       style: AppTextStyles.bodyLarge,
       decoration: InputDecoration(
         hintText: hint,

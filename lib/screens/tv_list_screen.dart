@@ -9,6 +9,7 @@ import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
 import '../widgets/tv_focus_manager.dart';
+import '../widgets/tv_text_field.dart';
 import 'player_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,12 +29,10 @@ class _TVListScreenState extends State<TVListScreen>
   // ── State ──────────────────────────────────────────────────────────────────
 
   final _searchCtrl   = TextEditingController();
-  final _searchFocus  = FocusNode();
   final _focusManager = TvFocusManager(columnCount: 1);
   String  _query           = '';
   String  _selectedCategory = 'Todos';
   List<Channel> _filtered  = [];
-  int _gridColumns = 1;
   // Asegura que focusFirst() solo se llame una vez al cargar la lista inicial.
   bool _hasFocusedOnce = false;
 
@@ -65,7 +64,6 @@ class _TVListScreenState extends State<TVListScreen>
   void dispose() {
     _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
-    _searchFocus.dispose();
     _focusManager.dispose();
     super.dispose();
   }
@@ -173,43 +171,11 @@ class _TVListScreenState extends State<TVListScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(
           AppSpacing.base, AppSpacing.md, AppSpacing.base, AppSpacing.sm),
-      child: TextField(
+      child: TvTextField(
         controller: _searchCtrl,
-        focusNode: _searchFocus,
-        style: AppTextStyles.searchInput,
-        decoration: InputDecoration(
-          hintText: 'Buscar canal...',
-          hintStyle: AppTextStyles.bodyMedium,
-          prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-          suffixIcon: _query.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear,
-                      color: AppColors.textSecondary),
-                  onPressed: () {
-                    _searchCtrl.clear();
-                    _searchFocus.unfocus();
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: AppColors.surfaceVariant,
-          contentPadding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.md, horizontal: AppSpacing.base),
-          border: OutlineInputBorder(
-            borderRadius: AppRadius.buttonRadius,
-            borderSide: const BorderSide(color: AppColors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: AppRadius.buttonRadius,
-            borderSide: const BorderSide(color: AppColors.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: AppRadius.buttonRadius,
-            borderSide:
-                const BorderSide(color: AppColors.accent, width: 2),
-          ),
-        ),
-        onSubmitted: (_) => _searchFocus.unfocus(),
+        hintText: 'Buscar canal...',
+        prefixIcon:
+            const Icon(Icons.search, color: AppColors.textSecondary),
       ),
     );
   }
@@ -264,7 +230,6 @@ class _TVListScreenState extends State<TVListScreen>
             final tileHeight = ResponsiveSpacing.getChannelTileHeight(device);
 
             // Keep focus manager in sync with current column count and item count.
-            _gridColumns = cols;
             _focusManager.columnCount = cols;
             _focusManager.resize(_filtered.length);
 
@@ -590,10 +555,10 @@ class _InitialAvatar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _CategoryChip
+// _CategoryChip — navegable con D-Pad
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CategoryChip extends StatelessWidget {
+class _CategoryChip extends StatefulWidget {
   final String label;
   final bool   selected;
   final VoidCallback onTap;
@@ -602,29 +567,85 @@ class _CategoryChip extends StatelessWidget {
       {required this.label, required this.selected, required this.onTap});
 
   @override
+  State<_CategoryChip> createState() => _CategoryChipState();
+}
+
+class _CategoryChipState extends State<_CategoryChip> {
+  final _focusNode = FocusNode();
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!mounted) return;
+    setState(() => _hasFocus = _focusNode.hasFocus);
+    if (_focusNode.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Scrollable.ensureVisible(context,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeInOut);
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppDurations.fast,
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.base, vertical: AppSpacing.xs + 2),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.accent : AppColors.surfaceVariant,
-          borderRadius: AppRadius.chipRadius,
-          border: Border.all(
-            color:
-                selected ? AppColors.accent : AppColors.border,
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.base, vertical: AppSpacing.xs + 2),
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? AppColors.accent
+                : AppColors.surfaceVariant,
+            borderRadius: AppRadius.chipRadius,
+            border: Border.all(
+              color: _hasFocus
+                  ? AppColors.focusBorder
+                  : widget.selected
+                      ? AppColors.accent
+                      : AppColors.border,
+              width: _hasFocus ? 2 : 1,
+            ),
+            boxShadow: _hasFocus
+                ? [BoxShadow(color: AppColors.focusGlow, blurRadius: 8)]
+                : [],
           ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.labelMedium.copyWith(
-            color: selected
-                ? AppColors.textInverse
-                : AppColors.textSecondary,
-            fontWeight:
-                selected ? FontWeight.w600 : FontWeight.w400,
+          child: Text(
+            widget.label,
+            style: AppTextStyles.labelMedium.copyWith(
+              color: widget.selected
+                  ? AppColors.textInverse
+                  : AppColors.textSecondary,
+              fontWeight:
+                  widget.selected ? FontWeight.w600 : FontWeight.w400,
+            ),
           ),
         ),
       ),
