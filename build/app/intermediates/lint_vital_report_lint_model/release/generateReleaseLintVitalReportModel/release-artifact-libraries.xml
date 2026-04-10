@@ -4,9 +4,6 @@
       jars="D:\PERSONAL\Dinero\IPTV\build\app\intermediates\flutter\release\libs.jar"
       resolved="__local_aars__:D:\PERSONAL\Dinero\IPTV\build\app\intermediates\flutter\release\libs.jar:unspecified"/>
   <library
-      name=":@@:mobile_scanner::release"
-      project=":mobile_scanner"/>
-  <library
       name=":@@:path_provider_android::release"
       project=":path_provider_android"/>
   <library
@@ -372,45 +369,6 @@
       externalAnnotations="annotations.zip"
       proguardRules="proguard.txt"/>
   <library
-      name="androidx.camera:camera-lifecycle:1.3.1@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\043a1593f5a6406818ca2cb2453aab0c\transformed\camera-lifecycle-1.3.1\jars\classes.jar"
-      resolved="androidx.camera:camera-lifecycle:1.3.1"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\043a1593f5a6406818ca2cb2453aab0c\transformed\camera-lifecycle-1.3.1"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="androidx.camera:camera-camera2:1.3.1@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\e222dd5564ddb4801b255fcb266bf8a2\transformed\camera-camera2-1.3.1\jars\classes.jar"
-      resolved="androidx.camera:camera-camera2:1.3.1"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\e222dd5564ddb4801b255fcb266bf8a2\transformed\camera-camera2-1.3.1"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="androidx.camera:camera-core:1.3.1@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\1c8759531551614f6557d4a51919b6b5\transformed\camera-core-1.3.1\jars\classes.jar"
-      resolved="androidx.camera:camera-core:1.3.1"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\1c8759531551614f6557d4a51919b6b5\transformed\camera-core-1.3.1"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
       name="androidx.media3:media3-extractor:1.4.1@aar"
       jars="C:\Users\artur\.gradle\caches\transforms-3\aed4990e1d074d74f02835561e91543b\transformed\media3-extractor-1.4.1\jars\classes.jar"
       resolved="androidx.media3:media3-extractor:1.4.1"
@@ -554,123 +512,6 @@
       externalAnnotations="annotations.zip"
       proguardRules="proguard.txt"/>
   <library
-      name="com.google.mlkit:barcode-scanning:17.2.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\980506df29b5ebd43e5deb658f41b080\transformed\barcode-scanning-17.2.0\jars\classes.jar"
-      resolved="com.google.mlkit:barcode-scanning:17.2.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\980506df29b5ebd43e5deb658f41b080\transformed\barcode-scanning-17.2.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\334ab99a39d01f83d78af95dafa3f01d\transformed\play-services-mlkit-barcode-scanning-18.3.0\jars\classes.jar"
-      resolved="com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\334ab99a39d01f83d78af95dafa3f01d\transformed\play-services-mlkit-barcode-scanning-18.3.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.mlkit:barcode-scanning-common:17.0.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\ae1b24b00dffb845e08dfc7a67e63886\transformed\barcode-scanning-common-17.0.0\jars\classes.jar"
-      resolved="com.google.mlkit:barcode-scanning-common:17.0.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\ae1b24b00dffb845e08dfc7a67e63886\transformed\barcode-scanning-common-17.0.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.mlkit:vision-common:17.3.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\59b0107a0dfd83c729546ee501ff815a\transformed\vision-common-17.3.0\jars\classes.jar"
-      resolved="com.google.mlkit:vision-common:17.3.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\59b0107a0dfd83c729546ee501ff815a\transformed\vision-common-17.3.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.mlkit:common:18.9.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\c78b4d725ca1799de2b14bc891dffa17\transformed\common-18.9.0\jars\classes.jar"
-      resolved="com.google.mlkit:common:18.9.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\c78b4d725ca1799de2b14bc891dffa17\transformed\common-18.9.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.android.gms:play-services-base:18.1.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\b6aa4778a98117731fa42f3eadd73a91\transformed\play-services-base-18.1.0\jars\classes.jar"
-      resolved="com.google.android.gms:play-services-base:18.1.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\b6aa4778a98117731fa42f3eadd73a91\transformed\play-services-base-18.1.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.mlkit:vision-interfaces:16.2.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\62274d9299245fd576916273e7b6812f\transformed\vision-interfaces-16.2.0\jars\classes.jar"
-      resolved="com.google.mlkit:vision-interfaces:16.2.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\62274d9299245fd576916273e7b6812f\transformed\vision-interfaces-16.2.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.android.gms:play-services-tasks:18.0.2@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\a4ed14e85a796fc82d4e3ec4a8d6ca9f\transformed\play-services-tasks-18.0.2\jars\classes.jar"
-      resolved="com.google.android.gms:play-services-tasks:18.0.2"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\a4ed14e85a796fc82d4e3ec4a8d6ca9f\transformed\play-services-tasks-18.0.2"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.android.gms:play-services-basement:18.1.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\79ea11f45ade5d8d5a01474519c63868\transformed\play-services-basement-18.1.0\jars\classes.jar"
-      resolved="com.google.android.gms:play-services-basement:18.1.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\79ea11f45ade5d8d5a01474519c63868\transformed\play-services-basement-18.1.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
       name="androidx.profileinstaller:profileinstaller:1.3.1@aar"
       jars="C:\Users\artur\.gradle\caches\transforms-3\de72768b230ab6120d0ace1fdeef0184\transformed\profileinstaller-1.3.1\jars\classes.jar"
       resolved="androidx.profileinstaller:profileinstaller:1.3.1"
@@ -696,75 +537,6 @@
       symbolFile="R.txt"
       externalAnnotations="annotations.zip"
       proguardRules="proguard.txt"/>
-  <library
-      name="com.google.android.datatransport:transport-backend-cct:2.3.3@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\ede53d914057643b0c5df8c2406b2921\transformed\transport-backend-cct-2.3.3\jars\classes.jar"
-      resolved="com.google.android.datatransport:transport-backend-cct:2.3.3"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\ede53d914057643b0c5df8c2406b2921\transformed\transport-backend-cct-2.3.3"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.android.datatransport:transport-runtime:2.2.6@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\26a7958e29ba61892c151059477a8bc9\transformed\transport-runtime-2.2.6\jars\classes.jar"
-      resolved="com.google.android.datatransport:transport-runtime:2.2.6"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\26a7958e29ba61892c151059477a8bc9\transformed\transport-runtime-2.2.6"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.android.datatransport:transport-api:2.2.1@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\103cf650348cd3a6cb30280580931732\transformed\transport-api-2.2.1\jars\classes.jar"
-      resolved="com.google.android.datatransport:transport-api:2.2.1"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\103cf650348cd3a6cb30280580931732\transformed\transport-api-2.2.1"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.firebase:firebase-components:16.1.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\cd61fa6d61c7a3822cf0ba204bce42fc\transformed\firebase-components-16.1.0\jars\classes.jar"
-      resolved="com.google.firebase:firebase-components:16.1.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\cd61fa6d61c7a3822cf0ba204bce42fc\transformed\firebase-components-16.1.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.firebase:firebase-encoders-json:17.1.0@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\18f40a3c7665856d3d7165c43d4c0df6\transformed\firebase-encoders-json-17.1.0\jars\classes.jar"
-      resolved="com.google.firebase:firebase-encoders-json:17.1.0"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\18f40a3c7665856d3d7165c43d4c0df6\transformed\firebase-encoders-json-17.1.0"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="com.google.firebase:firebase-encoders:16.1.0@jar"
-      jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\com.google.firebase\firebase-encoders\16.1.0\267565db8531da1483692e27eb58f93ec894c78\firebase-encoders-16.1.0.jar"
-      resolved="com.google.firebase:firebase-encoders:16.1.0"/>
   <library
       name="androidx.interpolator:interpolator:1.0.0@aar"
       jars="C:\Users\artur\.gradle\caches\transforms-3\d31736beae536e7133f48817378a57b8\transformed\interpolator-1.0.0\jars\classes.jar"
@@ -796,10 +568,6 @@
       externalAnnotations="annotations.zip"
       proguardRules="proguard.txt"/>
   <library
-      name="com.google.auto.value:auto-value-annotations:1.6.3@jar"
-      jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\com.google.auto.value\auto-value-annotations\1.6.3\b88c1bb7f149f6d2cc03898359283e57b08f39cc\auto-value-annotations-1.6.3.jar"
-      resolved="com.google.auto.value:auto-value-annotations:1.6.3"/>
-  <library
       name="com.google.guava:guava:33.0.0-android@jar"
       jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\com.google.guava\guava\33.0.0-android\cfbbdc54f232feedb85746aeeea0722f5244bb9a\guava-33.0.0-android.jar"
       resolved="com.google.guava:guava:33.0.0-android"/>
@@ -807,27 +575,6 @@
       name="com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava@jar"
       jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\com.google.guava\listenablefuture\9999.0-empty-to-avoid-conflict-with-guava\b421526c5f297295adef1c886e5246c39d4ac629\listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar"
       resolved="com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava"/>
-  <library
-      name="com.google.android.odml:image:1.0.0-beta1@aar"
-      jars="C:\Users\artur\.gradle\caches\transforms-3\b170caff0cc6e1753bd2f2c07b98676d\transformed\image-1.0.0-beta1\jars\classes.jar"
-      resolved="com.google.android.odml:image:1.0.0-beta1"
-      folder="C:\Users\artur\.gradle\caches\transforms-3\b170caff0cc6e1753bd2f2c07b98676d\transformed\image-1.0.0-beta1"
-      manifest="AndroidManifest.xml"
-      resFolder="res"
-      assetsFolder="assets"
-      lintJar="lint.jar"
-      publicResources="public.txt"
-      symbolFile="R.txt"
-      externalAnnotations="annotations.zip"
-      proguardRules="proguard.txt"/>
-  <library
-      name="javax.inject:javax.inject:1@jar"
-      jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\javax.inject\javax.inject\1\6975da39a7040257bd51d21a231b76c915872d38\javax.inject-1.jar"
-      resolved="javax.inject:javax.inject:1"/>
-  <library
-      name="com.google.firebase:firebase-annotations:16.0.0@jar"
-      jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\com.google.firebase\firebase-annotations\16.0.0\dbeae20d6c97b747b59ef47b6dcf770ba1a60fa6\firebase-annotations-16.0.0.jar"
-      resolved="com.google.firebase:firebase-annotations:16.0.0"/>
   <library
       name="com.google.guava:failureaccess:1.0.2@jar"
       jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\com.google.guava\failureaccess\1.0.2\c4a06a64e650562f30b7bf9aaec1bfed43aca12b\failureaccess-1.0.2.jar"

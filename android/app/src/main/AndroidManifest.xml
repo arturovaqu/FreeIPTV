@@ -3,12 +3,11 @@
 
     <!-- Network access: required for M3U playlist fetching and stream playback -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required to enumerate network interfaces for the local pairing server -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <!-- Keep screen on during playback -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <!-- Camera: required for QR playlist scanner (not required so TV builds still work) -->
-    <uses-permission android:name="android.permission.CAMERA"/>
-    <uses-feature android:name="android.hardware.camera" android:required="false"/>
-    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
 
     <application
         android:label="IPTV App"

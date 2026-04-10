@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
 import '../services/m3u_parser.dart';
+import '../services/pairing_server.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
@@ -12,7 +14,6 @@ import '../widgets/tv_text_field.dart';
 import 'favorites_screen.dart';
 import 'history_screen.dart';
 import 'movies_list_screen.dart';
-import 'qr_scanner_screen.dart';
 import 'search_screen.dart';
 import 'series_list_screen.dart';
 import 'settings_screen.dart';
@@ -319,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    final result = await showDialog<String>(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _AddPlaylistDialog(
@@ -329,23 +330,6 @@ class _HomeScreenState extends State<HomeScreen>
         onSuccess: () => _tabController.animateTo(0),
       ),
     );
-
-    // User tapped "Abrir cámara" — open scanner then re-show dialog with data.
-    if (result == '__scan__' && context.mounted) {
-      final scanned =
-          await Navigator.push<({String url, String name})?>(
-        context,
-        MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-      );
-      if (scanned != null && context.mounted) {
-        // Re-open dialog pre-filled — auto-loads immediately via _submit.
-        await _showAddPlaylistDialog(
-          context, storage,
-          prefillUrl: scanned.url,
-          prefillName: scanned.name,
-        );
-      }
-    }
   }
 
   Future<void> _showEditPlaylistDialog(
@@ -479,13 +463,6 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
     super.dispose();
   }
 
-  // ── Scan QR ───────────────────────────────────────────────────────────────
-
-  Future<void> _openScanner() async {
-    // Pop dialog first so the camera screen is full-screen.
-    Navigator.pop(context, '__scan__');
-  }
-
   // ── Submit ────────────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
@@ -565,9 +542,17 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
               ),
             ],
 
-            // ── QR option ──────────────────────────────────────────────────
+            // ── QR / Remote Pairing ────────────────────────────────────────
             if (_mode == _InputMode.qr)
-              _QrModeHint(onScan: _openScanner),
+              _QrPairingPanel(
+                onReceived: (url, name) {
+                  _urlCtrl.text = url;
+                  _nameCtrl.text = name;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _submit();
+                  });
+                },
+              ),
 
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.sm),
@@ -723,61 +708,187 @@ class _ModeButtonState extends State<_ModeButton> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _QrModeHint — instructions + open-camera CTA shown in QR mode
+// _QrPairingPanel — Remote Pairing: la TV genera el QR, el móvil envía la URL
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _QrModeHint extends StatelessWidget {
-  final VoidCallback onScan;
-  const _QrModeHint({required this.onScan});
+enum _PairingStatus { starting, ready, received, noNetwork, error }
+
+class _QrPairingPanel extends StatefulWidget {
+  final void Function(String url, String name) onReceived;
+  const _QrPairingPanel({required this.onReceived});
+
+  @override
+  State<_QrPairingPanel> createState() => _QrPairingPanelState();
+}
+
+class _QrPairingPanelState extends State<_QrPairingPanel> {
+  final _server = PairingServer();
+  _PairingStatus _status = _PairingStatus.starting;
+  String? _serverUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _startServer();
+  }
+
+  @override
+  void dispose() {
+    _server.stop();
+    super.dispose();
+  }
+
+  Future<void> _startServer() async {
+    try {
+      await _server.start(_onPlaylistReceived);
+      if (!mounted) return;
+      final url = _server.serverUrl;
+      setState(() {
+        _serverUrl = url;
+        _status = url != null ? _PairingStatus.ready : _PairingStatus.noNetwork;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _status = _PairingStatus.error);
+    }
+  }
+
+  void _onPlaylistReceived(String url, String name) {
+    if (!mounted) return;
+    setState(() => _status = _PairingStatus.received);
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) widget.onReceived(url, name);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    return switch (_status) {
+      _PairingStatus.starting   => _buildLoading('Iniciando servidor…'),
+      _PairingStatus.ready      => _buildQr(),
+      _PairingStatus.received   => _buildReceived(),
+      _PairingStatus.noNetwork  => _buildMessage(
+          Icons.wifi_off,
+          'Sin red Wi-Fi',
+          'Conéctate a la misma red que tu móvil e inténtalo de nuevo.',
+        ),
+      _PairingStatus.error      => _buildMessage(
+          Icons.error_outline,
+          'Error al iniciar el servidor',
+          'Comprueba los permisos de red e inténtalo de nuevo.',
+        ),
+    };
+  }
+
+  Widget _buildLoading(String msg) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const CircularProgressIndicator(color: AppColors.accent),
+          const SizedBox(height: AppSpacing.md),
+          Text(msg, style: AppTextStyles.bodyMedium),
+        ]),
+      );
+
+  Widget _buildReceived() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.check_circle,
+              color: AppColors.success, size: 56),
+          const SizedBox(height: AppSpacing.md),
+          const Text('¡Datos recibidos!',
+              style: AppTextStyles.headlineSmall),
+          const SizedBox(height: AppSpacing.sm),
+          const Text('Cargando playlist…',
+              style: AppTextStyles.bodyMedium),
+          const SizedBox(height: AppSpacing.lg),
+          const CircularProgressIndicator(color: AppColors.accent),
+        ]),
+      );
+
+  Widget _buildMessage(IconData icon, String title, String body) => Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant,
+          borderRadius: AppRadius.cardRadius,
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 48, color: AppColors.textDisabled),
+          const SizedBox(height: AppSpacing.md),
+          Text(title,
+              style: AppTextStyles.headlineSmall,
+              textAlign: TextAlign.center),
+          const SizedBox(height: AppSpacing.sm),
+          Text(body,
+              style: AppTextStyles.bodyMedium,
+              textAlign: TextAlign.center),
+        ]),
+      );
+
+  Widget _buildQr() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // QR code sobre fondo blanco
         Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
+            color: Colors.white,
             borderRadius: AppRadius.cardRadius,
-            border: Border.all(color: AppColors.border),
           ),
-          child: Column(
-            children: [
-              const Icon(Icons.qr_code_2,
-                  size: 56, color: AppColors.accent),
-              const SizedBox(height: AppSpacing.md),
-              const Text(
-                'Genera el QR desde tu PC',
-                style: AppTextStyles.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              const Text(
-                'Abre qr_generator.html en tu navegador, '
-                'ingresa la URL M3U y el nombre, '
-                'luego escanea el QR con esta pantalla.',
-                style: AppTextStyles.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: onScan,
-            icon: const Icon(Icons.camera_alt),
-            label: const Text('Abrir cámara'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-              shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.buttonRadius),
+          child: QrImageView(
+            data: _serverUrl!,
+            version: QrVersions.auto,
+            size: 200,
+            backgroundColor: Colors.white,
+            eyeStyle: const QrEyeStyle(
+              eyeShape: QrEyeShape.square,
+              color: Colors.black,
+            ),
+            dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square,
+              color: Colors.black,
             ),
           ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // Instrucción principal
+        const Text(
+          'Escanea este código con la cámara de tu móvil',
+          style: AppTextStyles.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'para añadir la playlist directamente desde tu teléfono',
+          style: AppTextStyles.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
+        // URL manual como fallback
+        Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.base, vertical: AppSpacing.xs),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant,
+            borderRadius: AppRadius.chipRadius,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Text(
+            _serverUrl!,
+            style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.accent,
+                fontFamily: 'monospace'),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'O escribe esta dirección en el navegador del móvil',
+          style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary),
+          textAlign: TextAlign.center,
         ),
       ],
     );
