@@ -133,27 +133,12 @@ class _HomeScreenState extends State<HomeScreen>
   // ── TabBar ─────────────────────────────────────────────────────────────────
 
   Widget _buildTabBar() {
-    final device  = getDeviceInfo(context);
-    final iconSz  = ResponsiveSpacing.getIconSize(device);
-    final bodyFs  = ResponsiveSpacing.getBodyFontSize(device);
-    return Container(
-      color: AppColors.surface,
-      child: TabBar(
-        controller: _tabController,
-        indicatorColor: AppColors.accent,
-        indicatorWeight: 3,
-        labelColor: AppColors.accent,
-        unselectedLabelColor: AppColors.textSecondary,
-        labelStyle: AppTextStyles.labelLarge.copyWith(fontSize: bodyFs - 1),
-        unselectedLabelStyle: AppTextStyles.labelMedium.copyWith(fontSize: bodyFs - 2),
-        tabs: _tabs
-            .map((t) => Tab(
-                  icon: Icon(t.icon, size: iconSz),
-                  text: t.label,
-                  iconMargin: const EdgeInsets.only(bottom: 2),
-                ))
-            .toList(),
-      ),
+    final device = getDeviceInfo(context);
+    return _TvTabBar(
+      controller: _tabController,
+      tabs: _tabs,
+      iconSize: ResponsiveSpacing.getIconSize(device),
+      fontSize: ResponsiveSpacing.getBodyFontSize(device),
     );
   }
 
@@ -891,6 +876,250 @@ class _QrPairingPanelState extends State<_QrPairingPanel> {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _TvTabBar — barra de pestañas navegable con D-Pad
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TvTabBar extends StatefulWidget {
+  final TabController controller;
+  final List<({IconData icon, String label})> tabs;
+  final double iconSize;
+  final double fontSize;
+
+  const _TvTabBar({
+    required this.controller,
+    required this.tabs,
+    required this.iconSize,
+    required this.fontSize,
+  });
+
+  @override
+  State<_TvTabBar> createState() => _TvTabBarState();
+}
+
+class _TvTabBarState extends State<_TvTabBar> {
+  late final List<FocusNode> _nodes;
+
+  @override
+  void initState() {
+    super.initState();
+    _nodes = List.generate(
+      widget.tabs.length,
+      (i) => FocusNode(debugLabel: 'TvTab#$i'),
+    );
+    widget.controller.addListener(_onTabChange);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTabChange);
+    for (final n in _nodes) n.dispose();
+    super.dispose();
+  }
+
+  void _onTabChange() => setState(() {});
+
+  // Mueve el foco al tab siguiente/anterior con las flechas del D-Pad.
+  KeyEventResult _handleKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final cur = _nodes.indexWhere((n) => n.hasFocus);
+    if (cur == -1) return KeyEventResult.ignored;
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft && cur > 0) {
+      _nodes[cur - 1].requestFocus();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+        cur < _nodes.length - 1) {
+      _nodes[cur + 1].requestFocus();
+      return KeyEventResult.handled;
+    }
+    // arrowDown / otros → propagan para que el contenido debajo tome el foco
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.surface,
+      child: Focus(
+        skipTraversal: true, // la barra no es un nodo de traversal propio
+        onKeyEvent: (_, event) => _handleKey(event),
+        child: Row(
+          children: List.generate(
+            widget.tabs.length,
+            (i) => Expanded(
+              child: _TvTabItem(
+                icon: widget.tabs[i].icon,
+                label: widget.tabs[i].label,
+                isSelected: widget.controller.index == i,
+                focusNode: _nodes[i],
+                iconSize: widget.iconSize,
+                fontSize: widget.fontSize,
+                onTap: () => widget.controller.animateTo(i),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _TvTabItem — pestaña individual con hover visual inmediato
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TvTabItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final FocusNode focusNode;
+  final double iconSize;
+  final double fontSize;
+  final VoidCallback onTap;
+
+  const _TvTabItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.focusNode,
+    required this.iconSize,
+    required this.fontSize,
+    required this.onTap,
+  });
+
+  @override
+  State<_TvTabItem> createState() => _TvTabItemState();
+}
+
+class _TvTabItemState extends State<_TvTabItem> {
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(_TvTabItem old) {
+    super.didUpdateWidget(old);
+    if (old.focusNode != widget.focusNode) {
+      old.focusNode.removeListener(_onFocusChange);
+      widget.focusNode.addListener(_onFocusChange);
+      _hasFocus = widget.focusNode.hasFocus;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!mounted) return;
+    setState(() => _hasFocus = widget.focusNode.hasFocus);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.isSelected;
+    final hover  = _hasFocus;
+
+    // Color del ícono y texto
+    final contentColor =
+        (active || hover) ? AppColors.accent : AppColors.textSecondary;
+
+    return Focus(
+      focusNode: widget.focusNode,
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          // Fondo sutil del tab completo al hacer hover
+          color: hover
+              ? AppColors.accent.withValues(alpha: 0.08)
+              : Colors.transparent,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Pastilla iluminada alrededor de ícono + texto
+              AnimatedContainer(
+                duration: AppDurations.fast,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.base, vertical: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: hover
+                      ? AppColors.accent.withValues(alpha: 0.15)
+                      : Colors.transparent,
+                  borderRadius: AppRadius.buttonRadius,
+                  border: hover
+                      ? Border.all(
+                          color: AppColors.focusBorder,
+                          width: 2,
+                        )
+                      : null,
+                  boxShadow: hover
+                      ? [
+                          BoxShadow(
+                            color: AppColors.focusGlow,
+                            blurRadius: 12,
+                            spreadRadius: 1,
+                          )
+                        ]
+                      : [],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(widget.icon,
+                        size: widget.iconSize, color: contentColor),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        fontSize: widget.fontSize - 1,
+                        fontWeight: (active || hover)
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: contentColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Línea indicadora de pestaña activa (3 px, debajo)
+              const SizedBox(height: AppSpacing.xs),
+              AnimatedContainer(
+                duration: AppDurations.fast,
+                height: 3,
+                width: active ? 32 : 0,
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

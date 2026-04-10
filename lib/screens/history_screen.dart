@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
-import 'movies_list_screen.dart';
 import 'player_screen.dart';
 import 'series_list_screen.dart';
 
