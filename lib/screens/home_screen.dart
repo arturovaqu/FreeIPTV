@@ -923,45 +923,26 @@ class _TvTabBarState extends State<_TvTabBar> {
 
   void _onTabChange() => setState(() {});
 
-  // Mueve el foco al tab siguiente/anterior con las flechas del D-Pad.
-  KeyEventResult _handleKey(KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final cur = _nodes.indexWhere((n) => n.hasFocus);
-    if (cur == -1) return KeyEventResult.ignored;
-
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft && cur > 0) {
-      _nodes[cur - 1].requestFocus();
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
-        cur < _nodes.length - 1) {
-      _nodes[cur + 1].requestFocus();
-      return KeyEventResult.handled;
-    }
-    // arrowDown / otros → propagan para que el contenido debajo tome el foco
-    return KeyEventResult.ignored;
-  }
-
   @override
   Widget build(BuildContext context) {
+    // No wrapping Focus here: each _TvTabItem sits directly in the traversal
+    // tree so the D-Pad can reach them without any skipTraversal barrier.
     return Container(
       color: AppColors.surface,
-      child: Focus(
-        skipTraversal: true, // la barra no es un nodo de traversal propio
-        onKeyEvent: (_, event) => _handleKey(event),
-        child: Row(
-          children: List.generate(
-            widget.tabs.length,
-            (i) => Expanded(
-              child: _TvTabItem(
-                icon: widget.tabs[i].icon,
-                label: widget.tabs[i].label,
-                isSelected: widget.controller.index == i,
-                focusNode: _nodes[i],
-                iconSize: widget.iconSize,
-                fontSize: widget.fontSize,
-                onTap: () => widget.controller.animateTo(i),
-              ),
+      child: Row(
+        children: List.generate(
+          widget.tabs.length,
+          (i) => Expanded(
+            child: _TvTabItem(
+              icon: widget.tabs[i].icon,
+              label: widget.tabs[i].label,
+              isSelected: widget.controller.index == i,
+              focusNode: _nodes[i],
+              index: i,
+              allNodes: _nodes,
+              iconSize: widget.iconSize,
+              fontSize: widget.fontSize,
+              onTap: () => widget.controller.animateTo(i),
             ),
           ),
         ),
@@ -975,19 +956,23 @@ class _TvTabBarState extends State<_TvTabBar> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _TvTabItem extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final FocusNode focusNode;
-  final double iconSize;
-  final double fontSize;
-  final VoidCallback onTap;
+  final IconData         icon;
+  final String           label;
+  final bool             isSelected;
+  final FocusNode        focusNode;
+  final int              index;
+  final List<FocusNode>  allNodes;
+  final double           iconSize;
+  final double           fontSize;
+  final VoidCallback     onTap;
 
   const _TvTabItem({
     required this.icon,
     required this.label,
     required this.isSelected,
     required this.focusNode,
+    required this.index,
+    required this.allNodes,
     required this.iconSize,
     required this.fontSize,
     required this.onTap,
@@ -1039,13 +1024,27 @@ class _TvTabItemState extends State<_TvTabItem> {
     return Focus(
       focusNode: widget.focusNode,
       onKeyEvent: (_, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.enter ||
-                event.logicalKey == LogicalKeyboardKey.select)) {
-          widget.onTap();
-          return KeyEventResult.handled;
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        switch (event.logicalKey) {
+          case LogicalKeyboardKey.enter:
+          case LogicalKeyboardKey.select:
+            widget.onTap();
+            return KeyEventResult.handled;
+          case LogicalKeyboardKey.arrowLeft:
+            if (widget.index > 0) {
+              widget.allNodes[widget.index - 1].requestFocus();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          case LogicalKeyboardKey.arrowRight:
+            if (widget.index < widget.allNodes.length - 1) {
+              widget.allNodes[widget.index + 1].requestFocus();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          default:
+            return KeyEventResult.ignored;
         }
-        return KeyEventResult.ignored;
       },
       child: GestureDetector(
         onTap: widget.onTap,
