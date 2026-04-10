@@ -104,18 +104,25 @@ class SearchService {
 
   // ── Categories ───────────────────────────────────────────────────────────────
 
-  /// Returns unique, sorted category strings for [type] from [playlist].
+  /// Returns unique, sorted, non-empty category strings for [type] from [playlist].
   List<String> getCategories(ContentType type, Playlist playlist) {
-    final Set<String> cats;
+    Iterable<String> raw;
     switch (type) {
       case ContentType.TV:
-        cats = playlist.channels.map((c) => c.group).toSet();
+        raw = playlist.channels.map((c) => c.group);
       case ContentType.SERIES:
-        cats = playlist.series.map((s) => s.category).toSet();
+        raw = playlist.series.map((s) => s.category);
       case ContentType.MOVIES:
-        cats = playlist.movies.map((m) => m.category).toSet();
+        raw = playlist.movies.map((m) => m.category);
     }
-    return (cats.toList()..sort());
+    // Trim each value, discard blanks, then deduplicate and sort.
+    final cats = raw
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return cats;
   }
 
   // ── Filter helpers ────────────────────────────────────────────────────────────

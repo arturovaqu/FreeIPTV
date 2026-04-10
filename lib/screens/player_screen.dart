@@ -85,6 +85,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // ── Timers ─────────────────────────────────────────────────────────────────
   Timer?  _hideTimer;
   Timer?  _nextEpTimer;
+  Timer?  _volumeHideTimer;
   int     _nextEpCountdown  = 10;
 
   // ── Listeners ──────────────────────────────────────────────────────────────
@@ -157,6 +158,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _media.stop(); // stop playback so audio doesn't continue after navigation
     _hideTimer?.cancel();
     _nextEpTimer?.cancel();
+    _volumeHideTimer?.cancel();
     _media.isBufferingNotifier.removeListener(_bufferingListener);
     _media.completedNotifier.removeListener(_completedListener);
     _media.errorNotifier.removeListener(_errorListener);
@@ -339,6 +341,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _cancelHide() => _hideTimer?.cancel();
 
+  /// Shows the volume slider overlay and schedules its auto-dismiss.
+  void _showVolumeOverlay() {
+    _volumeHideTimer?.cancel();
+    if (!_showVolumeSlider) setState(() => _showVolumeSlider = true);
+    _volumeHideTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showVolumeSlider = false);
+    });
+  }
+
   void _toggleControls() {
     if (_controlsVisible) {
       _hideTimer?.cancel();
@@ -434,9 +445,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowUp:
         _media.setVolume((_media.volume + 5).clamp(0, 100));
+        _showVolumeOverlay();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowDown:
         _media.setVolume((_media.volume - 5).clamp(0, 100));
+        _showVolumeOverlay();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.select:
       case LogicalKeyboardKey.enter:

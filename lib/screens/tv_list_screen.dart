@@ -8,6 +8,7 @@ import '../services/search_service.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
+import '../widgets/tv_focus_manager.dart';
 import 'player_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,9 +29,11 @@ class _TVListScreenState extends State<TVListScreen>
 
   final _searchCtrl   = TextEditingController();
   final _searchFocus  = FocusNode();
+  final _focusManager = TvFocusManager(columnCount: 1);
   String  _query           = '';
   String  _selectedCategory = 'Todos';
   List<Channel> _filtered  = [];
+  int _gridColumns = 1;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -61,6 +64,7 @@ class _TVListScreenState extends State<TVListScreen>
     _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
     _searchFocus.dispose();
+    _focusManager.dispose();
     super.dispose();
   }
 
@@ -248,15 +252,23 @@ class _TVListScreenState extends State<TVListScreen>
             final spacing    = ResponsiveSpacing.getItemSpacing(device);
             final tileHeight = ResponsiveSpacing.getChannelTileHeight(device);
 
+            // Keep focus manager in sync with current column count and item count.
+            _gridColumns = cols;
+            _focusManager.columnCount = cols;
+            _focusManager.resize(_filtered.length);
+
             Widget buildTile(int i) {
               final ch        = _filtered[i];
               final isPlaying = playingChannel?.id == ch.id;
               final isFav     = storage.isFavorite(ch.id, ContentType.TV);
               return _ChannelTile(
+                key: ValueKey(ch.id),
                 channel: ch,
                 isPlaying: isPlaying,
                 isFavorite: isFav,
                 channelIndex: i + 1,
+                focusNode: _focusManager.nodeAt(i),
+                onFocused: () => _focusManager.onItemFocused(i),
                 onTap: () => _openPlayer(ch),
                 onFavoriteToggle: () {
                   if (isFav) {
@@ -268,24 +280,34 @@ class _TVListScreenState extends State<TVListScreen>
               );
             }
 
+            // Wrap the scrollable in a Focus that routes D-Pad navigation.
             if (cols == 1) {
-              return ListView.builder(
-                padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
-                itemCount: _filtered.length,
-                itemBuilder: (_, i) => buildTile(i),
+              return Focus(
+                onKeyEvent: (_, e) =>
+                    _focusManager.handleKey(_filtered.length, e),
+                child: ListView.builder(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+                  itemCount: _filtered.length,
+                  itemBuilder: (_, i) => buildTile(i),
+                ),
               );
             }
 
-            return GridView.builder(
-              padding: EdgeInsets.fromLTRB(spacing, 0, spacing, AppSpacing.xxl),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: cols,
-                mainAxisExtent: tileHeight,
-                crossAxisSpacing: spacing,
-                mainAxisSpacing: 2,
+            return Focus(
+              onKeyEvent: (_, e) =>
+                  _focusManager.handleKey(_filtered.length, e),
+              child: GridView.builder(
+                padding:
+                    EdgeInsets.fromLTRB(spacing, 0, spacing, AppSpacing.xxl),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cols,
+                  mainAxisExtent: tileHeight,
+                  crossAxisSpacing: spacing,
+                  mainAxisSpacing: 2,
+                ),
+                itemCount: _filtered.length,
+                itemBuilder: (_, i) => buildTile(i),
               ),
-              itemCount: _filtered.length,
-              itemBuilder: (_, i) => buildTile(i),
             );
           },
         );
@@ -298,133 +320,195 @@ class _TVListScreenState extends State<TVListScreen>
 // _ChannelTile
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ChannelTile extends StatelessWidget {
-  final Channel channel;
-  final bool    isPlaying;
-  final bool    isFavorite;
-  final int     channelIndex;
+class _ChannelTile extends StatefulWidget {
+  final Channel      channel;
+  final bool         isPlaying;
+  final bool         isFavorite;
+  final int          channelIndex;
+  final FocusNode    focusNode;
   final VoidCallback onTap;
   final VoidCallback onFavoriteToggle;
+  /// Called when this tile receives keyboard focus so the manager can track it.
+  final VoidCallback onFocused;
 
   const _ChannelTile({
+    super.key,
     required this.channel,
     required this.isPlaying,
     required this.isFavorite,
     required this.channelIndex,
+    required this.focusNode,
     required this.onTap,
     required this.onFavoriteToggle,
+    required this.onFocused,
   });
+
+  @override
+  State<_ChannelTile> createState() => _ChannelTileState();
+}
+
+class _ChannelTileState extends State<_ChannelTile> {
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocusChange);
+    _hasFocus = widget.focusNode.hasFocus;
+  }
+
+  @override
+  void didUpdateWidget(_ChannelTile old) {
+    super.didUpdateWidget(old);
+    if (old.focusNode != widget.focusNode) {
+      old.focusNode.removeListener(_onFocusChange);
+      widget.focusNode.addListener(_onFocusChange);
+      _hasFocus = widget.focusNode.hasFocus;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!mounted) return;
+    final focused = widget.focusNode.hasFocus;
+    setState(() => _hasFocus = focused);
+    if (focused) {
+      widget.onFocused();
+      // Scroll this tile into the visible area.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Focus(
-      onKeyEvent: (node, event) {
-        // Allow Enter/Select to trigger tap on TV remote
+      focusNode: widget.focusNode,
+      onKeyEvent: (_, event) {
         if (event is KeyDownEvent &&
-            event.logicalKey == LogicalKeyboardKey.enter) {
-          onTap();
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select)) {
+          widget.onTap();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
-      child: Builder(
-        builder: (ctx) {
-          final hasFocus = Focus.of(ctx).hasFocus;
-          return AnimatedContainer(
-            duration: AppDurations.fast,
-            margin: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm, vertical: 2),
-            decoration: BoxDecoration(
-              color: isPlaying
-                  ? AppColors.accentDim
-                  : hasFocus
-                      ? AppColors.cardHover
-                      : AppColors.card,
-              borderRadius: AppRadius.thumbnailRadius,
-              border: Border.all(
-                color: isPlaying
-                    ? AppColors.accentLive
-                    : hasFocus
-                        ? AppColors.focusBorder
-                        : Colors.transparent,
-                width: isPlaying || hasFocus ? 1.5 : 0,
-              ),
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: 2),
+        decoration: BoxDecoration(
+          color: widget.isPlaying
+              ? AppColors.accentDim
+              : _hasFocus
+                  ? AppColors.cardHover
+                  : AppColors.card,
+          borderRadius: AppRadius.thumbnailRadius,
+          border: Border.all(
+            color: widget.isPlaying
+                ? AppColors.accentLive
+                : _hasFocus
+                    ? AppColors.focusBorder
+                    : Colors.transparent,
+            width: widget.isPlaying || _hasFocus ? 2 : 0,
+          ),
+          boxShadow: _hasFocus
+              ? [
+                  BoxShadow(
+                    color: AppColors.focusGlow,
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  )
+                ]
+              : null,
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.base, vertical: AppSpacing.sm),
+          minVerticalPadding: AppSpacing.sm,
+          leading: _ChannelLogo(
+            logoUrl: widget.channel.logo,
+            channelName: widget.channel.name,
+            isPlaying: widget.isPlaying,
+          ),
+          title: Text(
+            widget.channel.name,
+            style: AppTextStyles.bodyLarge.copyWith(
+              color: _hasFocus
+                  ? AppColors.textPrimary
+                  : AppColors.textPrimary,
+              fontWeight:
+                  widget.isPlaying || _hasFocus ? FontWeight.w600 : FontWeight.w400,
             ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.base, vertical: AppSpacing.sm),
-              minVerticalPadding: AppSpacing.sm,
-              leading: _ChannelLogo(
-                logoUrl: channel.logo,
-                channelName: channel.name,
-                isPlaying: isPlaying,
-              ),
-              title: Text(
-                channel.name,
-                style: AppTextStyles.bodyLarge.copyWith(
-                  color: isPlaying
-                      ? AppColors.textPrimary
-                      : AppColors.textPrimary,
-                  fontWeight:
-                      isPlaying ? FontWeight.w600 : FontWeight.w400,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Row(
+            children: [
+              if (widget.isPlaying) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentLive,
+                    borderRadius: AppRadius.chipRadius,
+                  ),
+                  child: const Text('EN VIVO',
+                      style: AppTextStyles.badge),
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Flexible(
+                child: Text(
+                  widget.channel.group,
+                  style: AppTextStyles.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              subtitle: Row(
-                children: [
-                  if (isPlaying) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentLive,
-                        borderRadius: AppRadius.chipRadius,
-                      ),
-                      child: const Text('EN VIVO',
-                          style: AppTextStyles.badge),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                  ],
-                  Flexible(
-                    child: Text(
-                      channel.group,
-                      style: AppTextStyles.bodySmall,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Channel number
+              SizedBox(
+                width: 40,
+                child: Text(
+                  widget.channelIndex.toString(),
+                  style: AppTextStyles.channelNumber,
+                  textAlign: TextAlign.center,
+                ),
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Channel number
-                  SizedBox(
-                    width: 40,
-                    child: Text(
-                      channelIndex.toString(),
-                      style: AppTextStyles.channelNumber,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  // Favorite button
-                  IconButton(
-                    icon: Icon(
-                      isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: isFavorite
-                          ? AppColors.error
-                          : AppColors.textDisabled,
-                      size: 22,
-                    ),
-                    onPressed: onFavoriteToggle,
-                    tooltip: isFavorite ? 'Quitar favorito' : 'Agregar favorito',
-                  ),
-                ],
+              // Favorite button
+              IconButton(
+                icon: Icon(
+                  widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: widget.isFavorite
+                      ? AppColors.error
+                      : AppColors.textDisabled,
+                  size: 22,
+                ),
+                onPressed: widget.onFavoriteToggle,
+                tooltip:
+                    widget.isFavorite ? 'Quitar favorito' : 'Agregar favorito',
               ),
-              onTap: onTap,
-            ),
-          );
-        },
+            ],
+          ),
+          onTap: widget.onTap,
+        ),
       ),
     );
   }

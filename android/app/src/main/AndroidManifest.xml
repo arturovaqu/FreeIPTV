@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Keep screen on during playback -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Camera: required for QR playlist scanner (not required so TV builds still work) -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
 
     <application
         android:label="IPTV App"

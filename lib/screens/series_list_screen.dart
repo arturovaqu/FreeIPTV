@@ -76,15 +76,34 @@ class _SeriesListScreenState extends State<SeriesListScreen>
     final playlist = widget.playlist;
     if (playlist == null) { _filtered = []; return; }
 
+    // 1. Base list: all series or search results
     List<Series> result = _query.trim().isEmpty
         ? List<Series>.from(_all)
         : SearchService.instance
             .searchByType(_query, playlist, ContentType.SERIES)
             .cast<Series>();
 
+    // 2. Category filter (trim both sides so whitespace differences don't break it)
     if (_selectedCat != 'Todas') {
-      result = result.where((s) => s.category == _selectedCat).toList();
+      final cat = _selectedCat.trim();
+      result = result
+          .where((s) => s.category.trim() == cat)
+          .toList();
+
+      // If the selected category produced no results (e.g. because the search
+      // already narrowed the list), reset to "Todas" automatically so the user
+      // is not left staring at an empty screen.
+      if (result.isEmpty) {
+        _selectedCat = 'Todas';
+        result = _query.trim().isEmpty
+            ? List<Series>.from(_all)
+            : SearchService.instance
+                .searchByType(_query, playlist, ContentType.SERIES)
+                .cast<Series>();
+      }
     }
+
+    // 3. Year filter
     if (_selectedYear != null) {
       result = result.where((s) => s.year == _selectedYear).toList();
     }

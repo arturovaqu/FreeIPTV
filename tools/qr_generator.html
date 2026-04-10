@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPTV QR Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #f0f0f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #1e1e2a;
+      border: 1px solid #2a2a3a;
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 540px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .header svg { color: #7c4dff; flex-shrink: 0; }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f0f0f5;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #9090a8;
+      margin-top: 2px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #9090a8;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input {
+      width: 100%;
+      background: #13131a;
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      color: #f0f0f5;
+      font-size: 15px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus { border-color: #7c4dff; }
+    input::placeholder { color: #4a4a60; }
+
+    .field { margin-bottom: 20px; }
+
+    button {
+      width: 100%;
+      background: #7c4dff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 14px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    button:hover  { background: #6a3de8; }
+    button:active { transform: scale(0.98); }
+
+    .qr-section {
+      margin-top: 32px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .qr-section.visible { display: flex; }
+
+    .qr-wrap {
+      background: #fff;
+      padding: 16px;
+      border-radius: 12px;
+    }
+
+    .qr-info {
+      text-align: center;
+      font-size: 13px;
+      color: #9090a8;
+      line-height: 1.6;
+    }
+
+    .qr-info strong { color: #f0f0f5; }
+
+    .payload-box {
+      background: #13131a;
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #7c4dff;
+      word-break: break-all;
+      width: 100%;
+      text-align: left;
+    }
+
+    .dl-btn {
+      background: #1c1c26;
+      border: 1px solid #2a2a3a;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 20px;
+      width: auto;
+    }
+
+    .dl-btn:hover { background: #252535; }
+
+    .divider {
+      height: 1px;
+      background: #2a2a3a;
+      margin: 24px 0;
+    }
+
+    .steps {
+      font-size: 13px;
+      color: #9090a8;
+      line-height: 2;
+      counter-reset: step;
+    }
+
+    .steps li {
+      counter-increment: step;
+      list-style: none;
+      padding-left: 28px;
+      position: relative;
+    }
+
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      width: 18px;
+      height: 18px;
+      background: #7c4dff;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      top: 2px;
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round"
+           stroke-linejoin="round" style="color:#7c4dff">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <path d="M14 14h2v2h-2zM18 14h3v3M21 18v3h-3M14 18h2v3"/>
+      </svg>
+      <div>
+        <h1>IPTV QR Generator</h1>
+        <div class="subtitle">Genera un QR para agregar playlists sin teclado</div>
+      </div>
+    </div>
+
+    <!-- ── How it works ──────────────────────────────────────────────── -->
+    <ol class="steps">
+      <li>Pega la URL de tu playlist M3U y escribe un nombre</li>
+      <li>Haz clic en <strong>Generar QR</strong></li>
+      <li>Escanea el QR con la app desde la TV o móvil</li>
+    </ol>
+
+    <div class="divider"></div>
+
+    <!-- ── Form ──────────────────────────────────────────────────────── -->
+    <div class="field">
+      <label for="url">URL M3U</label>
+      <input id="url" type="url"
+             placeholder="http://servidor.com/get.php?username=...&type=m3u_plus"
+             autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label for="name">Nombre de la playlist</label>
+      <input id="name" type="text" placeholder="Mi IPTV" autocomplete="off">
+    </div>
+
+    <button onclick="generate()">Generar QR</button>
+
+    <!-- ── QR result ──────────────────────────────────────────────────── -->
+    <div class="qr-section" id="qrSection">
+      <div class="qr-wrap">
+        <canvas id="qrCanvas"></canvas>
+      </div>
+      <div class="qr-info">
+        Escanea este código desde la app IPTV.<br>
+        La playlist se cargará automáticamente.<br><br>
+        <strong>Playlist:</strong> <span id="qrName">—</span>
+      </div>
+      <pre class="payload-box" id="payloadBox"></pre>
+      <button class="dl-btn" onclick="downloadQr()">⬇ Descargar imagen</button>
+    </div>
+  </div>
+
+  <script>
+    function generate() {
+      const url  = document.getElementById('url').value.trim();
+      const name = document.getElementById('name').value.trim();
+
+      if (!url) { alert('Por favor ingresa la URL de la playlist.'); return; }
+
+      const payload = JSON.stringify({ url, name });
+
+      const canvas = document.getElementById('qrCanvas');
+      QRCode.toCanvas(canvas, payload, {
+        width: 280,
+        margin: 1,
+        color: { dark: '#000000', light: '#ffffff' },
+        errorCorrectionLevel: 'M',
+      }, function (err) {
+        if (err) { alert('Error al generar QR: ' + err.message); return; }
+
+        document.getElementById('qrName').textContent    = name || url;
+        document.getElementById('payloadBox').textContent = payload;
+        document.getElementById('qrSection').classList.add('visible');
+        document.getElementById('qrSection').scrollIntoView({ behavior: 'smooth' });
+      });
+    }
+
+    function downloadQr() {
+      const canvas = document.getElementById('qrCanvas');
+      const link   = document.createElement('a');
+      const name   = document.getElementById('name').value.trim() || 'playlist';
+      link.download = name.replace(/[^a-z0-9]/gi, '_') + '_qr.png';
+      link.href     = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Allow Enter key on inputs to trigger generation.
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') generate();
+    });
+  </script>
+</body>
+</html>

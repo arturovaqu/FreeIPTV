@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Flutter / Dart
+# ─────────────────────────────────────────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+dart_tool/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Build output — ignore everything EXCEPT the release APK
+# ─────────────────────────────────────────────────────────────────────────────
+build/
+
+# Re-include the release APK so it can be distributed via the repo
+!build/
+!build/app/
+!build/app/outputs/
+!build/app/outputs/flutter-apk/
+!build/app/outputs/flutter-apk/app-release.apk
+!build/app/outputs/flutter-apk/app-release.apk.sha1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Android
+# ─────────────────────────────────────────────────────────────────────────────
+# Local SDK/NDK paths — machine-specific, never commit
+android/local.properties
+# Gradle caches and build internals
+android/.gradle/
+android/.kotlin/
+# Generated files
+android/app/src/main/GeneratedPluginRegistrant.java
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDE — IntelliJ / Android Studio
+# ─────────────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Claude Code — local session config (contains machine-specific settings)
+# ─────────────────────────────────────────────────────────────────────────────
+.claude/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal development docs (prompts, skills, tips) — not for public repos
+# ─────────────────────────────────────────────────────────────────────────────
+FLUTTER_IPTV_SKILL_V2.md
+IPTV_APP_V2_CLAUDE_CODE.md
+IPTV_TIPS_TROUBLESHOOTING.md
+PROMPTS_V2_CLAUDE_CODE.md
+
+# Screenshots taken during development
+flutter_01.png
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OS junk
+# ─────────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment / secrets
+# ─────────────────────────────────────────────────────────────────────────────
+.env
+.env.*
+*.keystore
+*.jks
+key.properties

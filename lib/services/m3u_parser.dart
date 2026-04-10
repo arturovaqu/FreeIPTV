@@ -232,12 +232,7 @@ class M3UParser {
               sName,
               () => _SeriesMeta(
                     poster: logo,
-                    // If group-title equals the series name, it's being used as
-                    // a series identifier, not a genre. Fall back to 'Series' so
-                    // the category dropdown shows genres, not series names.
-                    category: (group.isEmpty || group == sName)
-                        ? 'Series'
-                        : group,
+                    category: _deriveSeriesCategory(group, sName),
                   ));
           seriesCount++;
           if (_dbgSeries.length < 5) {
@@ -345,6 +340,59 @@ class M3UParser {
       'SERIES': seriesList,
       'MOVIES': movies,
     };
+  }
+
+  // ── Private: category derivation ─────────────────────────────────────────────
+
+  /// Derives a genre/category string from the M3U `group-title` attribute.
+  ///
+  /// Many providers set `group-title` to the series name (not the genre), so we
+  /// must distinguish "identifier" groups from "genre" groups:
+  ///
+  /// - Empty → `'Series'`
+  /// - Equals the series name (case-insensitive, trimmed) → `'Series'`
+  /// - Contains `|` separators (e.g. `"EN | SERIES | Acción"`) → strip language
+  ///   codes and meta-tokens, return the best genre token or `'Series'`
+  /// - Otherwise → the trimmed group-title as-is (it's a genre label)
+  static String _deriveSeriesCategory(String group, String seriesName) {
+    final g     = group.trim();
+    final sLow  = seriesName.trim().toLowerCase();
+
+    // 1. Empty → generic bucket
+    if (g.isEmpty) return 'Series';
+
+    // 2. Exact series-name match (case-insensitive) → not a genre
+    if (g.toLowerCase() == sLow) return 'Series';
+
+    // 3. Pipe-separated format: e.g. "ES | SERIES | Drama" or "Series | Acción"
+    if (g.contains('|')) {
+      final parts = g
+          .split('|')
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty)
+          .toList();
+
+      final genre = parts.lastWhere(
+        (p) {
+          final low = p.toLowerCase();
+          // Skip: equals the series name
+          if (low == sLow) return false;
+          // Skip: generic "series/serie" labels
+          if (low == 'series' || low == 'serie' || low == 'tvshow') return false;
+          // Skip: language/country codes (1–3 uppercase letters)
+          if (RegExp(r'^[A-Z]{1,3}$').hasMatch(p)) return false;
+          return true;
+        },
+        orElse: () => '',
+      );
+
+      return genre.isNotEmpty ? genre : 'Series';
+    }
+
+    // 4. Group-title contains the series name as a substring → not a genre
+    if (g.toLowerCase().contains(sLow) && sLow.length > 4) return 'Series';
+
+    return g;
   }
 
   // ── Private: classification ──────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import '../utils/responsive.dart';
 import 'favorites_screen.dart';
 import 'history_screen.dart';
 import 'movies_list_screen.dart';
+import 'qr_scanner_screen.dart';
 import 'search_screen.dart';
 import 'series_list_screen.dart';
 import 'settings_screen.dart';
@@ -293,34 +294,56 @@ class _HomeScreenState extends State<HomeScreen>
   // ── Dialogs ───────────────────────────────────────────────────────────────
 
   Future<void> _showAddPlaylistDialog(
-      BuildContext context, StorageService storage) async {
-    await showDialog<void>(
+      BuildContext context, StorageService storage,
+      {String prefillUrl = '', String prefillName = ''}) async {
+    Future<String?> loadPlaylist(String url, String name) async {
+      try {
+        final parsed = await M3UParser.loadPlaylistFromURL(url);
+        final playlist = Playlist(
+          id: _uuid.v4(),
+          name: name.isNotEmpty ? name : _nameFromUrl(url),
+          url: url,
+          channels: List<Channel>.from(parsed['TV']  ?? []),
+          series:   List<Series>.from(parsed['SERIES'] ?? []),
+          movies:   List<Movie>.from(parsed['MOVIES']  ?? []),
+          lastUpdated: DateTime.now(),
+          isActive: true,
+        );
+        await storage.savePlaylist(playlist);
+        await storage.setActivePlaylist(playlist.id);
+        return null;
+      } catch (e) {
+        return e.toString();
+      }
+    }
+
+    final result = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _AddPlaylistDialog(
-        onLoad: (url, name) async {
-          try {
-            final parsed = await M3UParser.loadPlaylistFromURL(url);
-            final playlist = Playlist(
-              id: _uuid.v4(),
-              name: name.isNotEmpty ? name : _nameFromUrl(url),
-              url: url,
-              channels: List<Channel>.from(parsed['TV']  ?? []),
-              series:   List<Series>.from(parsed['SERIES'] ?? []),
-              movies:   List<Movie>.from(parsed['MOVIES']  ?? []),
-              lastUpdated: DateTime.now(),
-              isActive: true,
-            );
-            await storage.savePlaylist(playlist);
-            await storage.setActivePlaylist(playlist.id);
-            return null; // success
-          } catch (e) {
-            return e.toString(); // returns error message
-          }
-        },
+        prefillUrl: prefillUrl,
+        prefillName: prefillName,
+        onLoad: loadPlaylist,
         onSuccess: () => _tabController.animateTo(0),
       ),
     );
+
+    // User tapped "Abrir cámara" — open scanner then re-show dialog with data.
+    if (result == '__scan__' && context.mounted) {
+      final scanned =
+          await Navigator.push<({String url, String name})?>(
+        context,
+        MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+      );
+      if (scanned != null && context.mounted) {
+        // Re-open dialog pre-filled — auto-loads immediately via _submit.
+        await _showAddPlaylistDialog(
+          context, storage,
+          prefillUrl: scanned.url,
+          prefillName: scanned.name,
+        );
+      }
+    }
   }
 
   Future<void> _showEditPlaylistDialog(
@@ -405,22 +428,47 @@ class _HomeScreenState extends State<HomeScreen>
 // _AddPlaylistDialog
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// How the user wants to add a playlist.
+enum _InputMode { manual, qr }
+
 class _AddPlaylistDialog extends StatefulWidget {
   /// [onLoad] receives (url, name) and returns an error string or null on success.
   final Future<String?> Function(String url, String name) onLoad;
   final VoidCallback onSuccess;
+  final String prefillUrl;
+  final String prefillName;
 
-  const _AddPlaylistDialog({required this.onLoad, required this.onSuccess});
+  const _AddPlaylistDialog({
+    required this.onLoad,
+    required this.onSuccess,
+    this.prefillUrl  = '',
+    this.prefillName = '',
+  });
 
   @override
   State<_AddPlaylistDialog> createState() => _AddPlaylistDialogState();
 }
 
 class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
-  final _urlCtrl  = TextEditingController();
-  final _nameCtrl = TextEditingController();
-  bool   _loading = false;
-  String? _error;
+  late final TextEditingController _urlCtrl;
+  late final TextEditingController _nameCtrl;
+  _InputMode _mode = _InputMode.manual;
+  bool        _loading = false;
+  String?     _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl  = TextEditingController(text: widget.prefillUrl);
+    _nameCtrl = TextEditingController(text: widget.prefillName);
+
+    // Auto-submit when the dialog is opened with a pre-filled URL from QR scan.
+    if (widget.prefillUrl.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _submit();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -428,6 +476,15 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
     _nameCtrl.dispose();
     super.dispose();
   }
+
+  // ── Scan QR ───────────────────────────────────────────────────────────────
+
+  Future<void> _openScanner() async {
+    // Pop dialog first so the camera screen is full-screen.
+    Navigator.pop(context, '__scan__');
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
     final url = _urlCtrl.text.trim();
@@ -444,7 +501,6 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
 
     if (error != null) {
       setState(() { _loading = false; _error = error; });
-      // Show red snackbar — dialog context is still active at this point.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),
@@ -453,9 +509,6 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
         ),
       );
     } else {
-      // Capture messenger BEFORE popping: the dialog's BuildContext becomes
-      // deactivated the moment Navigator.pop() is called, so any attempt to
-      // call ScaffoldMessenger.of(context) afterwards would throw.
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
       widget.onSuccess();
@@ -469,6 +522,8 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
     }
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -479,20 +534,35 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
         width: 480,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _StyledTextField(
-              controller: _urlCtrl,
-              hint: 'URL M3U (http://...)',
-              enabled: !_loading,
-              keyboardType: TextInputType.url,
+            // ── Mode selector ──────────────────────────────────────────────
+            _ModeToggle(
+              selected: _mode,
+              onChanged: (m) => setState(() { _mode = m; _error = null; }),
             ),
-            const SizedBox(height: AppSpacing.md),
-            _StyledTextField(
-              controller: _nameCtrl,
-              hint: 'Nombre (opcional)',
-              enabled: !_loading,
-            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // ── Manual form ────────────────────────────────────────────────
+            if (_mode == _InputMode.manual) ...[
+              _StyledTextField(
+                controller: _urlCtrl,
+                hint: 'URL M3U (http://...)',
+                enabled: !_loading,
+                keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _StyledTextField(
+                controller: _nameCtrl,
+                hint: 'Nombre (opcional)',
+                enabled: !_loading,
+              ),
+            ],
+
+            // ── QR option ──────────────────────────────────────────────────
+            if (_mode == _InputMode.qr)
+              _QrModeHint(onScan: _openScanner),
+
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.sm),
               Text(_error!, style: const TextStyle(color: AppColors.error)),
@@ -508,10 +578,154 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
           child: const Text('Cancelar',
               style: TextStyle(color: AppColors.textSecondary)),
         ),
-        _PrimaryButton(
-          label: 'Cargar',
-          loading: _loading,
-          onPressed: _loading ? null : _submit,
+        if (_mode == _InputMode.manual)
+          _PrimaryButton(
+            label: 'Cargar',
+            loading: _loading,
+            onPressed: _loading ? null : _submit,
+          ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _ModeToggle — Manual / QR segmented switch
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ModeToggle extends StatelessWidget {
+  final _InputMode selected;
+  final ValueChanged<_InputMode> onChanged;
+
+  const _ModeToggle({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: _ModeButton(
+          icon: Icons.keyboard,
+          label: 'Escribir URL',
+          active: selected == _InputMode.manual,
+          onTap: () => onChanged(_InputMode.manual),
+        )),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: _ModeButton(
+          icon: Icons.qr_code_scanner,
+          label: 'Escanear QR',
+          active: selected == _InputMode.qr,
+          onTap: () => onChanged(_InputMode.qr),
+        )),
+      ],
+    );
+  }
+}
+
+class _ModeButton extends StatelessWidget {
+  final IconData icon;
+  final String   label;
+  final bool     active;
+  final VoidCallback onTap;
+
+  const _ModeButton({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.md, horizontal: AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: active ? AppColors.accent : AppColors.surfaceVariant,
+          borderRadius: AppRadius.buttonRadius,
+          border: Border.all(
+            color: active ? AppColors.accent : AppColors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 18,
+                color: active ? AppColors.textInverse : AppColors.textSecondary),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              label,
+              style: AppTextStyles.labelLarge.copyWith(
+                color: active ? AppColors.textInverse : AppColors.textSecondary,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _QrModeHint — instructions + open-camera CTA shown in QR mode
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _QrModeHint extends StatelessWidget {
+  final VoidCallback onScan;
+  const _QrModeHint({required this.onScan});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant,
+            borderRadius: AppRadius.cardRadius,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              const Icon(Icons.qr_code_2,
+                  size: 56, color: AppColors.accent),
+              const SizedBox(height: AppSpacing.md),
+              const Text(
+                'Genera el QR desde tu PC',
+                style: AppTextStyles.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const Text(
+                'Abre qr_generator.html en tu navegador, '
+                'ingresa la URL M3U y el nombre, '
+                'luego escanea el QR con esta pantalla.',
+                style: AppTextStyles.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: onScan,
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Abrir cámara'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              shape: RoundedRectangleBorder(
+                  borderRadius: AppRadius.buttonRadius),
+            ),
+          ),
         ),
       ],
     );
