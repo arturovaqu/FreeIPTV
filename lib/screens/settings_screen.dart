@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -35,21 +36,11 @@ class SettingsScreen extends StatelessWidget {
             children: [
               // ── Reproducción ─────────────────────────────────────────
               const _SectionHeader(label: 'Reproducción'),
-              Card(
-                color: AppColors.card,
-                margin: EdgeInsets.zero,
-                shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.cardRadius),
-                child: SwitchListTile(
-                  title: const Text('Subtítulos por defecto',
-                      style: AppTextStyles.bodyLarge),
-                  subtitle: const Text(
-                      'Activar subtítulos automáticamente al reproducir',
-                      style: AppTextStyles.bodyMedium),
-                  value: defaultSubs,
-                  activeColor: AppColors.accent,
-                  onChanged: (v) => storage.setDefaultSubtitles(v),
-                ),
+              _SwitchSettingsTile(
+                title: 'Subtítulos por defecto',
+                subtitle: 'Activar subtítulos automáticamente al reproducir',
+                value: defaultSubs,
+                onChanged: (v) => storage.setDefaultSubtitles(v),
               ),
 
               const SizedBox(height: AppSpacing.base),
@@ -154,7 +145,7 @@ class SettingsScreen extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Small widgets
+// _SectionHeader
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
@@ -175,7 +166,11 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _SettingsTile extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// _SettingsTile — accionable (tap + D-Pad Enter)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SettingsTile extends StatefulWidget {
   final IconData icon;
   final String title;
   final String subtitle;
@@ -189,21 +184,196 @@ class _SettingsTile extends StatelessWidget {
   });
 
   @override
+  State<_SettingsTile> createState() => _SettingsTileState();
+}
+
+class _SettingsTileState extends State<_SettingsTile> {
+  final _focusNode = FocusNode();
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!mounted) return;
+    setState(() => _hasFocus = _focusNode.hasFocus);
+    if (_focusNode.hasFocus) {
+      // Hace scroll hasta este ítem para que siempre sea visible.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.card,
-      margin: EdgeInsets.zero,
-      shape:
-          RoundedRectangleBorder(borderRadius: AppRadius.cardRadius),
-      child: ListTile(
-        leading: Icon(icon, color: AppColors.textSecondary, size: 22),
-        title: Text(title, style: AppTextStyles.bodyLarge),
-        subtitle: Text(subtitle, style: AppTextStyles.bodySmall),
-        trailing: onTap != null
-            ? const Icon(Icons.chevron_right,
-                color: AppColors.textSecondary, size: 20)
-            : null,
-        onTap: onTap,
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select) &&
+            widget.onTap != null) {
+          widget.onTap!();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: AppRadius.cardRadius,
+          border: Border.all(
+            color: _hasFocus ? AppColors.focusBorder : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: _hasFocus
+              ? [
+                  BoxShadow(
+                    color: AppColors.focusGlow,
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  )
+                ]
+              : [],
+        ),
+        child: ListTile(
+          leading: Icon(
+            widget.icon,
+            color: _hasFocus ? AppColors.accent : AppColors.textSecondary,
+            size: 22,
+          ),
+          title: Text(widget.title, style: AppTextStyles.bodyLarge),
+          subtitle: Text(widget.subtitle, style: AppTextStyles.bodySmall),
+          trailing: widget.onTap != null
+              ? Icon(
+                  Icons.chevron_right,
+                  color: _hasFocus
+                      ? AppColors.accent
+                      : AppColors.textSecondary,
+                  size: 20,
+                )
+              : null,
+          onTap: widget.onTap,
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _SwitchSettingsTile — toggle con D-Pad Enter + foco visual
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SwitchSettingsTile extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SwitchSettingsTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  State<_SwitchSettingsTile> createState() => _SwitchSettingsTileState();
+}
+
+class _SwitchSettingsTileState extends State<_SwitchSettingsTile> {
+  final _focusNode = FocusNode();
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!mounted) return;
+    setState(() => _hasFocus = _focusNode.hasFocus);
+    if (_focusNode.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: _focusNode,
+      // D-Pad Enter/Select activa el toggle
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select)) {
+          widget.onChanged(!widget.value);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: AppRadius.cardRadius,
+          border: Border.all(
+            color: _hasFocus ? AppColors.focusBorder : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: _hasFocus
+              ? [
+                  BoxShadow(
+                    color: AppColors.focusGlow,
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  )
+                ]
+              : [],
+        ),
+        child: SwitchListTile(
+          title: Text(widget.title, style: AppTextStyles.bodyLarge),
+          subtitle: Text(widget.subtitle, style: AppTextStyles.bodyMedium),
+          value: widget.value,
+          activeColor: AppColors.accent,
+          onChanged: widget.onChanged,
+        ),
       ),
     );
   }

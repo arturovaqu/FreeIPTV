@@ -8,6 +8,7 @@ import '../services/search_service.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
+import '../widgets/tv_focus_manager.dart';
 import 'player_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,11 +25,13 @@ class SeriesListScreen extends StatefulWidget {
 
 class _SeriesListScreenState extends State<SeriesListScreen>
     with AutomaticKeepAliveClientMixin {
-  final _searchCtrl  = TextEditingController();
+  final _searchCtrl   = TextEditingController();
+  final _focusManager = TvFocusManager();
   String _query           = '';
   String _selectedCat     = 'Todas';
   int?   _selectedYear;
   List<Series> _filtered  = [];
+  bool _hasFocusedOnce    = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -56,6 +59,7 @@ class _SeriesListScreenState extends State<SeriesListScreen>
   void dispose() {
     _searchCtrl.removeListener(_onQueryChanged);
     _searchCtrl.dispose();
+    _focusManager.dispose();
     super.dispose();
   }
 
@@ -109,6 +113,13 @@ class _SeriesListScreenState extends State<SeriesListScreen>
     }
 
     _filtered = result;
+
+    if (!_hasFocusedOnce && _filtered.isNotEmpty) {
+      _hasFocusedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusManager.focusFirst();
+      });
+    }
   }
 
   List<String> get _categories {
@@ -294,30 +305,41 @@ class _SeriesListScreenState extends State<SeriesListScreen>
         final device  = getDeviceInfo(context);
         final cols    = ResponsiveGrid.getGridColumns(device);
         final spacing = ResponsiveSpacing.getItemSpacing(device);
-        return GridView.builder(
-          padding: EdgeInsets.fromLTRB(spacing, AppSpacing.sm, spacing, AppSpacing.xxl),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            mainAxisSpacing: spacing,
-            crossAxisSpacing: spacing,
-            childAspectRatio: 0.62,
+
+        _focusManager.columnCount = cols;
+        _focusManager.resize(_filtered.length);
+
+        return Focus(
+          onKeyEvent: (_, e) => _focusManager.handleKey(_filtered.length, e),
+          child: GridView.builder(
+            padding: EdgeInsets.fromLTRB(spacing, AppSpacing.sm, spacing, AppSpacing.xxl),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              mainAxisSpacing: spacing,
+              crossAxisSpacing: spacing,
+              childAspectRatio: 0.62,
+            ),
+            itemCount: _filtered.length,
+            itemBuilder: (_, i) {
+              final s = _filtered[i];
+              final isFav = storage.isFavorite(s.id, ContentType.SERIES);
+              return _SeriesTile(
+                key: ValueKey(s.id),
+                series: s,
+                isFavorite: isFav,
+                focusNode: _focusManager.nodeAt(i),
+                onFocused: () => _focusManager.onItemFocused(i),
+                onTap: () => _showDetail(context, s),
+                onFavoriteToggle: () {
+                  if (isFav) {
+                    storage.removeFavorite(s.id, ContentType.SERIES);
+                  } else {
+                    storage.saveFavorite(s.id, ContentType.SERIES);
+                  }
+                },
+              );
+            },
           ),
-          itemCount: _filtered.length,
-          itemBuilder: (_, i) {
-            final s = _filtered[i];
-            return _SeriesCard(
-              series: s,
-              isFavorite: storage.isFavorite(s.id, ContentType.SERIES),
-              onTap: () => _showDetail(context, s),
-              onFavoriteToggle: () {
-                if (storage.isFavorite(s.id, ContentType.SERIES)) {
-                  storage.removeFavorite(s.id, ContentType.SERIES);
-                } else {
-                  storage.saveFavorite(s.id, ContentType.SERIES);
-                }
-              },
-            );
-          },
         );
       },
     );
@@ -334,119 +356,180 @@ class _SeriesListScreenState extends State<SeriesListScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _SeriesCard
+// _SeriesTile — tarjeta con foco gestionado por TvFocusManager
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SeriesCard extends StatelessWidget {
-  final Series series;
-  final bool   isFavorite;
+class _SeriesTile extends StatefulWidget {
+  final Series       series;
+  final bool         isFavorite;
+  final FocusNode    focusNode;
   final VoidCallback onTap;
   final VoidCallback onFavoriteToggle;
+  final VoidCallback onFocused;
 
-  const _SeriesCard({
+  const _SeriesTile({
+    super.key,
     required this.series,
     required this.isFavorite,
+    required this.focusNode,
     required this.onTap,
     required this.onFavoriteToggle,
+    required this.onFocused,
   });
+
+  @override
+  State<_SeriesTile> createState() => _SeriesTileState();
+}
+
+class _SeriesTileState extends State<_SeriesTile> {
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocusChange);
+    _hasFocus = widget.focusNode.hasFocus;
+  }
+
+  @override
+  void didUpdateWidget(_SeriesTile old) {
+    super.didUpdateWidget(old);
+    if (old.focusNode != widget.focusNode) {
+      old.focusNode.removeListener(_onFocusChange);
+      widget.focusNode.addListener(_onFocusChange);
+      _hasFocus = widget.focusNode.hasFocus;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!mounted) return;
+    setState(() => _hasFocus = widget.focusNode.hasFocus);
+    if (widget.focusNode.hasFocus) {
+      widget.onFocused();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Focus(
-      onKeyEvent: (_, e) {
-        if (e is KeyDownEvent &&
-            e.logicalKey == LogicalKeyboardKey.enter) {
-          onTap();
+      focusNode: widget.focusNode,
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select)) {
+          widget.onTap();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
-      child: Builder(builder: (ctx) {
-        final focused = Focus.of(ctx).hasFocus;
-        return GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: AppDurations.fast,
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: AppRadius.cardRadius,
-              border: Border.all(
-                color: focused ? AppColors.focusBorder : Colors.transparent,
-                width: 2,
-              ),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppRadius.cardRadius,
+            border: Border.all(
+              color: _hasFocus ? AppColors.focusBorder : Colors.transparent,
+              width: 2,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Poster
-                Expanded(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(AppRadius.md)),
-                        child: _Poster(url: series.poster, name: series.name),
-                      ),
-                      // Favorite button overlay
-                      Positioned(
-                        top: 6, right: 6,
-                        child: GestureDetector(
-                          onTap: onFavoriteToggle,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: AppColors.overlay,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              isFavorite
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: isFavorite
-                                  ? AppColors.error
-                                  : Colors.white70,
-                              size: 18,
-                            ),
+            boxShadow: _hasFocus
+                ? [
+                    BoxShadow(
+                      color: AppColors.focusGlow,
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    )
+                  ]
+                : [],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Poster
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(AppRadius.md)),
+                      child: _Poster(url: widget.series.poster, name: widget.series.name),
+                    ),
+                    // Favorite button overlay
+                    Positioned(
+                      top: 6, right: 6,
+                      child: GestureDetector(
+                        onTap: widget.onFavoriteToggle,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.overlay,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            widget.isFavorite
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: widget.isFavorite
+                                ? AppColors.error
+                                : Colors.white70,
+                            size: 18,
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                // Info
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(series.name,
-                          style: AppTextStyles.labelLarge,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 2),
-                      Row(children: [
-                        if (series.year != null) ...[
-                          Text(series.year.toString(),
-                              style: AppTextStyles.bodySmall),
-                          const SizedBox(width: AppSpacing.sm),
-                        ],
-                        if (series.rating != null) ...[
-                          const Icon(Icons.star,
-                              size: 12, color: AppColors.warning),
-                          const SizedBox(width: 2),
-                          Text(series.rating!.toStringAsFixed(1),
-                              style: AppTextStyles.bodySmall),
-                        ],
-                      ]),
-                    ],
-                  ),
+              ),
+              // Info
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.series.name,
+                        style: AppTextStyles.labelLarge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Row(children: [
+                      if (widget.series.year != null) ...[
+                        Text(widget.series.year.toString(),
+                            style: AppTextStyles.bodySmall),
+                        const SizedBox(width: AppSpacing.sm),
+                      ],
+                      if (widget.series.rating != null) ...[
+                        const Icon(Icons.star,
+                            size: 12, color: AppColors.warning),
+                        const SizedBox(width: 2),
+                        Text(widget.series.rating!.toStringAsFixed(1),
+                            style: AppTextStyles.bodySmall),
+                      ],
+                    ]),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      }),
+        ),
+      ),
     );
   }
 }

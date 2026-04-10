@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -452,6 +453,8 @@ class _AddPlaylistDialog extends StatefulWidget {
 class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
   late final TextEditingController _urlCtrl;
   late final TextEditingController _nameCtrl;
+  late final FocusNode _urlFocus;
+  late final FocusNode _nameFocus;
   _InputMode _mode = _InputMode.manual;
   bool        _loading = false;
   String?     _error;
@@ -461,6 +464,12 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
     super.initState();
     _urlCtrl  = TextEditingController(text: widget.prefillUrl);
     _nameCtrl = TextEditingController(text: widget.prefillName);
+    _urlFocus  = FocusNode();
+    _nameFocus = FocusNode();
+
+    // Invoke the TV soft keyboard whenever a field gains focus.
+    _urlFocus.addListener(_showImeOnFocus(_urlFocus));
+    _nameFocus.addListener(_showImeOnFocus(_nameFocus));
 
     // Auto-submit when the dialog is opened with a pre-filled URL from QR scan.
     if (widget.prefillUrl.isNotEmpty) {
@@ -470,10 +479,19 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
     }
   }
 
+  /// Returns a listener that calls TextInput.show when [node] gains focus.
+  VoidCallback _showImeOnFocus(FocusNode node) => () {
+    if (node.hasFocus) {
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+    }
+  };
+
   @override
   void dispose() {
     _urlCtrl.dispose();
     _nameCtrl.dispose();
+    _urlFocus.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
 
@@ -550,12 +568,15 @@ class _AddPlaylistDialogState extends State<_AddPlaylistDialog> {
                 hint: 'URL M3U (http://...)',
                 enabled: !_loading,
                 keyboardType: TextInputType.url,
+                focusNode: _urlFocus,
+                autofocus: true,
               ),
               const SizedBox(height: AppSpacing.md),
               _StyledTextField(
                 controller: _nameCtrl,
                 hint: 'Nombre (opcional)',
                 enabled: !_loading,
+                focusNode: _nameFocus,
               ),
             ],
 
@@ -621,7 +642,7 @@ class _ModeToggle extends StatelessWidget {
   }
 }
 
-class _ModeButton extends StatelessWidget {
+class _ModeButton extends StatefulWidget {
   final IconData icon;
   final String   label;
   final bool     active;
@@ -635,35 +656,81 @@ class _ModeButton extends StatelessWidget {
   });
 
   @override
+  State<_ModeButton> createState() => _ModeButtonState();
+}
+
+class _ModeButtonState extends State<_ModeButton> {
+  final _focusNode = FocusNode();
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!mounted) return;
+    setState(() => _hasFocus = _focusNode.hasFocus);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppDurations.fast,
-        padding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.md, horizontal: AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: active ? AppColors.accent : AppColors.surfaceVariant,
-          borderRadius: AppRadius.buttonRadius,
-          border: Border.all(
-            color: active ? AppColors.accent : AppColors.border,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon,
-                size: 18,
-                color: active ? AppColors.textInverse : AppColors.textSecondary),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              label,
-              style: AppTextStyles.labelLarge.copyWith(
-                color: active ? AppColors.textInverse : AppColors.textSecondary,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-              ),
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.md, horizontal: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: widget.active ? AppColors.accent : AppColors.surfaceVariant,
+            borderRadius: AppRadius.buttonRadius,
+            border: Border.all(
+              color: _hasFocus
+                  ? AppColors.focusBorder
+                  : widget.active
+                      ? AppColors.accent
+                      : AppColors.border,
+              width: _hasFocus ? 2 : 1,
             ),
-          ],
+            boxShadow: _hasFocus
+                ? [BoxShadow(color: AppColors.focusGlow, blurRadius: 10, spreadRadius: 1)]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(widget.icon,
+                  size: 18,
+                  color: widget.active ? AppColors.textInverse : AppColors.textSecondary),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                widget.label,
+                style: AppTextStyles.labelLarge.copyWith(
+                  color: widget.active ? AppColors.textInverse : AppColors.textSecondary,
+                  fontWeight: widget.active ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -969,12 +1036,16 @@ class _StyledTextField extends StatelessWidget {
   final String hint;
   final bool enabled;
   final TextInputType? keyboardType;
+  final FocusNode? focusNode;
+  final bool autofocus;
 
   const _StyledTextField({
     required this.controller,
     required this.hint,
     this.enabled = true,
     this.keyboardType,
+    this.focusNode,
+    this.autofocus = false,
   });
 
   @override
@@ -983,6 +1054,8 @@ class _StyledTextField extends StatelessWidget {
       controller: controller,
       enabled: enabled,
       keyboardType: keyboardType,
+      focusNode: focusNode,
+      autofocus: autofocus,
       style: AppTextStyles.bodyLarge,
       decoration: InputDecoration(
         hintText: hint,

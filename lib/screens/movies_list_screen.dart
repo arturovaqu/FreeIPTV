@@ -10,6 +10,7 @@ import '../services/search_service.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
+import '../widgets/tv_focus_manager.dart';
 import 'player_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,11 +27,13 @@ class MoviesListScreen extends StatefulWidget {
 
 class _MoviesListScreenState extends State<MoviesListScreen>
     with AutomaticKeepAliveClientMixin {
-  final _searchCtrl = TextEditingController();
+  final _searchCtrl  = TextEditingController();
+  final _focusManager = TvFocusManager();
   String _query          = '';
   String _selectedCat    = 'Todas';
   int?   _selectedYear;
   List<Movie> _filtered  = [];
+  bool _hasFocusedOnce   = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -61,6 +64,7 @@ class _MoviesListScreenState extends State<MoviesListScreen>
   void dispose() {
     _searchCtrl.removeListener(_onQueryChanged);
     _searchCtrl.dispose();
+    _focusManager.dispose();
     super.dispose();
   }
 
@@ -117,6 +121,13 @@ class _MoviesListScreenState extends State<MoviesListScreen>
       '[MoviesListScreen] _filtered=${_filtered.length}',
       name: 'MoviesListScreen',
     );
+
+    if (!_hasFocusedOnce && _filtered.isNotEmpty) {
+      _hasFocusedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusManager.focusFirst();
+      });
+    }
   }
 
   List<String> get _categories {
@@ -292,27 +303,37 @@ class _MoviesListScreenState extends State<MoviesListScreen>
         final device  = getDeviceInfo(context);
         final cols    = ResponsiveGrid.getGridColumns(device);
         final spacing = ResponsiveSpacing.getItemSpacing(device);
-        return GridView.builder(
-          padding: EdgeInsets.fromLTRB(spacing, AppSpacing.sm, spacing, AppSpacing.xxl),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            mainAxisSpacing: spacing,
-            crossAxisSpacing: spacing,
-            childAspectRatio: 0.62,
+
+        _focusManager.columnCount = cols;
+        _focusManager.resize(_filtered.length);
+
+        return Focus(
+          onKeyEvent: (_, e) => _focusManager.handleKey(_filtered.length, e),
+          child: GridView.builder(
+            padding: EdgeInsets.fromLTRB(spacing, AppSpacing.sm, spacing, AppSpacing.xxl),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              mainAxisSpacing: spacing,
+              crossAxisSpacing: spacing,
+              childAspectRatio: 0.62,
+            ),
+            itemCount: _filtered.length,
+            itemBuilder: (_, i) {
+              final m = _filtered[i];
+              final isFav = storage.isFavorite(m.id, ContentType.MOVIES);
+              return _MovieTile(
+                key: ValueKey(m.id),
+                movie: m,
+                isFavorite: isFav,
+                focusNode: _focusManager.nodeAt(i),
+                onFocused: () => _focusManager.onItemFocused(i),
+                onTap: () => _showDetail(m),
+                onFavoriteToggle: () => isFav
+                    ? storage.removeFavorite(m.id, ContentType.MOVIES)
+                    : storage.saveFavorite(m.id, ContentType.MOVIES),
+              );
+            },
           ),
-          itemCount: _filtered.length,
-          itemBuilder: (_, i) {
-            final m = _filtered[i];
-            final isFav = storage.isFavorite(m.id, ContentType.MOVIES);
-            return _MovieCard(
-              movie: m,
-              isFavorite: isFav,
-              onTap: () => _showDetail(m),
-              onFavoriteToggle: () => isFav
-                  ? storage.removeFavorite(m.id, ContentType.MOVIES)
-                  : storage.saveFavorite(m.id, ContentType.MOVIES),
-            );
-          },
         );
       },
     );
@@ -327,139 +348,200 @@ class _MoviesListScreenState extends State<MoviesListScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _MovieCard
+// _MovieTile — tarjeta con foco gestionado por TvFocusManager
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _MovieCard extends StatelessWidget {
-  final Movie    movie;
-  final bool     isFavorite;
+class _MovieTile extends StatefulWidget {
+  final Movie        movie;
+  final bool         isFavorite;
+  final FocusNode    focusNode;
   final VoidCallback onTap;
   final VoidCallback onFavoriteToggle;
+  final VoidCallback onFocused;
 
-  const _MovieCard({
+  const _MovieTile({
+    super.key,
     required this.movie,
     required this.isFavorite,
+    required this.focusNode,
     required this.onTap,
     required this.onFavoriteToggle,
+    required this.onFocused,
   });
+
+  @override
+  State<_MovieTile> createState() => _MovieTileState();
+}
+
+class _MovieTileState extends State<_MovieTile> {
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocusChange);
+    _hasFocus = widget.focusNode.hasFocus;
+  }
+
+  @override
+  void didUpdateWidget(_MovieTile old) {
+    super.didUpdateWidget(old);
+    if (old.focusNode != widget.focusNode) {
+      old.focusNode.removeListener(_onFocusChange);
+      widget.focusNode.addListener(_onFocusChange);
+      _hasFocus = widget.focusNode.hasFocus;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!mounted) return;
+    setState(() => _hasFocus = widget.focusNode.hasFocus);
+    if (widget.focusNode.hasFocus) {
+      widget.onFocused();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Focus(
-      onKeyEvent: (_, e) {
-        if (e is KeyDownEvent &&
-            e.logicalKey == LogicalKeyboardKey.enter) {
-          onTap();
+      focusNode: widget.focusNode,
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select)) {
+          widget.onTap();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
-      child: Builder(builder: (ctx) {
-        final focused = Focus.of(ctx).hasFocus;
-        return GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: AppDurations.fast,
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: AppRadius.cardRadius,
-              border: Border.all(
-                color: focused ? AppColors.focusBorder : Colors.transparent,
-                width: 2,
-              ),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppRadius.cardRadius,
+            border: Border.all(
+              color: _hasFocus ? AppColors.focusBorder : Colors.transparent,
+              width: 2,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Stack(fit: StackFit.expand, children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(AppRadius.md)),
-                      child: _Poster(url: movie.poster, name: movie.title),
-                    ),
-                    // Watched badge
-                    if (StorageService.instance
-                        .getHistory(ContentType.MOVIES)
-                        .any((e) => e.id == movie.id))
-                      Positioned(
-                        top: 6, left: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.85),
-                            borderRadius: AppRadius.chipRadius,
-                          ),
-                          child: const Text('VISTO',
-                              style: AppTextStyles.badge),
-                        ),
-                      ),
-                    // Favorite button
-                    Positioned(
-                      top: 6, right: 6,
-                      child: GestureDetector(
-                        onTap: onFavoriteToggle,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: AppColors.overlay,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            isFavorite
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            color: isFavorite
-                                ? AppColors.error
-                                : Colors.white70,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ]),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(movie.title,
-                          style: AppTextStyles.labelLarge,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 2),
-                      Row(children: [
-                        if (movie.year != null) ...[
-                          Text(movie.year.toString(),
-                              style: AppTextStyles.bodySmall),
-                          const SizedBox(width: AppSpacing.sm),
-                        ],
-                        if (movie.rating != null) ...[
-                          const Icon(Icons.star,
-                              size: 12, color: AppColors.warning),
-                          const SizedBox(width: 2),
-                          Text(movie.rating!.toStringAsFixed(1),
-                              style: AppTextStyles.bodySmall),
-                        ],
-                        if (movie.durationLabel != null) ...[
-                          const SizedBox(width: AppSpacing.sm),
-                          const Icon(Icons.access_time,
-                              size: 12, color: AppColors.textDisabled),
-                          const SizedBox(width: 2),
-                          Text(movie.durationLabel!,
-                              style: AppTextStyles.bodySmall),
-                        ],
-                      ]),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            boxShadow: _hasFocus
+                ? [
+                    BoxShadow(
+                      color: AppColors.focusGlow,
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    )
+                  ]
+                : [],
           ),
-        );
-      }),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Stack(fit: StackFit.expand, children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(AppRadius.md)),
+                    child: _Poster(url: widget.movie.poster, name: widget.movie.title),
+                  ),
+                  // Watched badge
+                  if (StorageService.instance
+                      .getHistory(ContentType.MOVIES)
+                      .any((e) => e.id == widget.movie.id))
+                    Positioned(
+                      top: 6, left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.85),
+                          borderRadius: AppRadius.chipRadius,
+                        ),
+                        child: const Text('VISTO',
+                            style: AppTextStyles.badge),
+                      ),
+                    ),
+                  // Favorite button
+                  Positioned(
+                    top: 6, right: 6,
+                    child: GestureDetector(
+                      onTap: widget.onFavoriteToggle,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: AppColors.overlay,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          widget.isFavorite
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: widget.isFavorite
+                              ? AppColors.error
+                              : Colors.white70,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.movie.title,
+                        style: AppTextStyles.labelLarge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Row(children: [
+                      if (widget.movie.year != null) ...[
+                        Text(widget.movie.year.toString(),
+                            style: AppTextStyles.bodySmall),
+                        const SizedBox(width: AppSpacing.sm),
+                      ],
+                      if (widget.movie.rating != null) ...[
+                        const Icon(Icons.star,
+                            size: 12, color: AppColors.warning),
+                        const SizedBox(width: 2),
+                        Text(widget.movie.rating!.toStringAsFixed(1),
+                            style: AppTextStyles.bodySmall),
+                      ],
+                      if (widget.movie.durationLabel != null) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        const Icon(Icons.access_time,
+                            size: 12, color: AppColors.textDisabled),
+                        const SizedBox(width: 2),
+                        Text(widget.movie.durationLabel!,
+                            style: AppTextStyles.bodySmall),
+                      ],
+                    ]),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

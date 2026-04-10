@@ -34,6 +34,8 @@ class _TVListScreenState extends State<TVListScreen>
   String  _selectedCategory = 'Todos';
   List<Channel> _filtered  = [];
   int _gridColumns = 1;
+  // Asegura que focusFirst() solo se llame una vez al cargar la lista inicial.
+  bool _hasFocusedOnce = false;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -105,6 +107,15 @@ class _TVListScreenState extends State<TVListScreen>
     }
 
     _filtered = result;
+
+    // La primera vez que hay ítems visibles, mueve el foco al primero para
+    // que el D-Pad pueda navegar inmediatamente sin un clic previo.
+    if (!_hasFocusedOnce && _filtered.isNotEmpty) {
+      _hasFocusedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusManager.focusFirst();
+      });
+    }
   }
 
   List<String> get _categories {
