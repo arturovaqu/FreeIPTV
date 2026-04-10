@@ -99,6 +99,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   // ── Focus ─────────────────────────────────────────────────────────────────
   final _focusNode = FocusNode();
+  /// Dedicated FocusNode for the Play/Pause button.
+  /// Requested automatically when the controls overlay becomes visible
+  /// via D-Pad so the user always has a sensible default focus target.
+  final _playFocus = FocusNode(debugLabel: 'PlayerCtrl.play');
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -164,6 +168,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _media.errorNotifier.removeListener(_errorListener);
     _media.subtitlesEnabledNotifier.removeListener(_subtitleListener);
     _focusNode.dispose();
+    _playFocus.dispose();
     _exitImmersive();
     super.dispose();
   }
@@ -327,9 +332,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   // ── Controls visibility ────────────────────────────────────────────────────
 
-  void _showControls() {
+  void _showControls({bool autoFocusPlay = false}) {
+    final wasHidden = !_controlsVisible;
     setState(() => _controlsVisible = true);
     _scheduleHide();
+    // When the overlay was hidden and a D-Pad key triggered it, give focus to
+    // the Play button so the user has a sensible default without extra presses.
+    if ((wasHidden || autoFocusPlay) && !_playFocus.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _playFocus.requestFocus();
+      });
+    }
   }
 
   void _scheduleHide() {
@@ -340,15 +353,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _cancelHide() => _hideTimer?.cancel();
-
-  /// Shows the volume slider overlay and schedules its auto-dismiss.
-  void _showVolumeOverlay() {
-    _volumeHideTimer?.cancel();
-    if (!_showVolumeSlider) setState(() => _showVolumeSlider = true);
-    _volumeHideTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _showVolumeSlider = false);
-    });
-  }
 
   void _toggleControls() {
     if (_controlsVisible) {
@@ -430,37 +434,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   // ── D-Pad keyboard handler ─────────────────────────────────────────────────
+  //
+  // Arrow keys are intentionally NOT handled here so that Flutter's
+  // FocusTraversal system can move focus between overlay buttons freely.
+  // Each _CtrlButton handles Enter/Select on its own FocusNode.
+  // Volume and seek shortcuts are removed: the user navigates to the
+  // dedicated buttons and presses OK (Android TV Leanback pattern).
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    // Any key press reveals the overlay; arrow keys are then free to traverse.
     _showControls();
 
     switch (event.logicalKey) {
-      case LogicalKeyboardKey.arrowRight:
-        _media.seek(_media.position + const Duration(seconds: 10));
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.arrowLeft:
-        final newPos = _media.position - const Duration(seconds: 10);
-        _media.seek(newPos < Duration.zero ? Duration.zero : newPos);
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.arrowUp:
-        _media.setVolume((_media.volume + 5).clamp(0, 100));
-        _showVolumeOverlay();
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.arrowDown:
-        _media.setVolume((_media.volume - 5).clamp(0, 100));
-        _showVolumeOverlay();
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.select:
-      case LogicalKeyboardKey.enter:
-      case LogicalKeyboardKey.space:
-        _media.isPlaying ? _media.pause() : _media.play();
-        return KeyEventResult.handled;
       case LogicalKeyboardKey.escape:
       case LogicalKeyboardKey.goBack:
         Navigator.pop(context);
         return KeyEventResult.handled;
       default:
+        // Return ignored so FocusTraversal receives arrow keys and focused
+        // buttons receive Enter/Select/Space.
         return KeyEventResult.ignored;
     }
   }
@@ -804,6 +798,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 buttonSize: largeBtnSize,
                 size: largeIconSz,
                 large: true,
+                focusNode: _playFocus,
                 onPressed:
                     playing ? _media.pause : _media.play,
               ),
@@ -1106,17 +1101,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _CtrlButton  — consistent control button for the overlay
+// _CtrlButton  — TV-aware control button with D-Pad hover visuals
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CtrlButton extends StatelessWidget {
-  final IconData   icon;
-  final double     size;
-  final bool       large;
-  final Color      color;
-  final String?    label;
-  final double?    buttonSize;
+class _CtrlButton extends StatefulWidget {
+  final IconData     icon;
+  final double       size;
+  final bool         large;
+  final Color        color;
+  final String?      label;
+  final double?      buttonSize;
   final VoidCallback onPressed;
+  /// Optional external FocusNode (e.g. to auto-focus the Play button).
+  final FocusNode?   focusNode;
 
   const _CtrlButton({
     required this.icon,
@@ -1126,32 +1123,97 @@ class _CtrlButton extends StatelessWidget {
     this.color      = Colors.white,
     this.label,
     this.buttonSize,
+    this.focusNode,
   });
 
   @override
+  State<_CtrlButton> createState() => _CtrlButtonState();
+}
+
+class _CtrlButtonState extends State<_CtrlButton> {
+  late final FocusNode _focus;
+  bool _hasFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus = widget.focusNode ?? FocusNode();
+    _focus.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (mounted) setState(() => _hasFocus = _focus.hasFocus);
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_onFocusChange);
+    // Only dispose if we created it internally.
+    if (widget.focusNode == null) _focus.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.select ||
+        event.logicalKey == LogicalKeyboardKey.enter  ||
+        event.logicalKey == LogicalKeyboardKey.space) {
+      widget.onPressed();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final sz = buttonSize ?? (large ? 64.0 : 44.0);
-    final btn = Container(
-      width:  sz,
-      height: sz,
-      decoration: const BoxDecoration(
-        color: Colors.black38,
-        shape: BoxShape.circle,
+    final sz  = widget.buttonSize ?? (widget.large ? 64.0 : 44.0);
+    final btn = Focus(
+      focusNode: _focus,
+      onKeyEvent: _handleKey,
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width:  sz,
+          height: sz,
+          decoration: BoxDecoration(
+            color: _hasFocus
+                ? AppColors.accent.withValues(alpha: 0.25)
+                : Colors.black38,
+            shape: BoxShape.circle,
+            border: _hasFocus
+                ? Border.all(color: AppColors.focusBorder, width: 2)
+                : null,
+            boxShadow: _hasFocus
+                ? [BoxShadow(
+                    color: AppColors.focusGlow,
+                    blurRadius: 16,
+                    spreadRadius: 2,
+                  )]
+                : [],
+          ),
+          child: Center(
+            child: Icon(
+              widget.icon,
+              color: _hasFocus ? Colors.white : widget.color,
+              size: widget.size,
+            ),
+          ),
+        ),
       ),
-      child: Icon(icon, color: color, size: size),
     );
 
-    return GestureDetector(
-      onTap: onPressed,
-      child: label != null
-          ? Column(mainAxisSize: MainAxisSize.min, children: [
-              btn,
-              const SizedBox(height: 4),
-              Text(label!,
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 10)),
-            ])
-          : btn,
-    );
+    if (widget.label != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          btn,
+          const SizedBox(height: 4),
+          Text(widget.label!,
+              style: const TextStyle(color: Colors.white70, fontSize: 10)),
+        ],
+      );
+    }
+    return btn;
   }
 }
