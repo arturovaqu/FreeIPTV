@@ -21,6 +21,8 @@ class MediaService extends ChangeNotifier {
   VideoPlayerController? _controller;
   Timer?                 _progressTimer;
   Timer?                 _positionPollTimer;
+  Timer?                 _seekTimeoutTimer;
+  int                    _openGeneration  = 0;
 
   // ── State ───────────────────────────────────────────────────────────────────
 
@@ -104,18 +106,39 @@ class MediaService extends ChangeNotifier {
   /// Opens [url] in a brand-new VideoPlayerController.
   ///
   /// Returns normally when the controller has been initialized and playback
-  /// started.  Throws / sets error state on failure.
+  /// started.  Sets error state on failure.
+  ///
+  /// Uses a generation counter so that if a second call arrives while the
+  /// first [ctrl.initialize()] is still running, the stale result is discarded
+  /// and only the latest request takes effect.
   Future<void> _openUrl(String url) async {
     _cancelProgressTimer();
     _cancelPositionPollTimer();
+    _seekTimeoutTimer?.cancel();
+    _seekTimeoutTimer = null;
     _clearError();
     completedNotifier.value   = false;
     isBufferingNotifier.value = true;
 
+    // Tear down the active controller NOW (synchronously) so the old stream
+    // stops playing immediately and its listener can no longer fire.
+    final staleCtrl = _controller;
+    _controller = null;
+    videoControllerNotifier.value = null;
+    if (staleCtrl != null) {
+      staleCtrl.removeListener(_onControllerUpdate);
+      staleCtrl.dispose();
+    }
+
+    // Stamp this request so a concurrent _openUrl() that finishes later can
+    // detect it is stale and discard its result.
+    final generation = ++_openGeneration;
+
     // Encode URL to handle spaces and special characters
     final safeUrl = Uri.encodeFull(url);
 
-    dev.log('[MediaService] Opening: $safeUrl', name: 'MediaService');
+    dev.log('[MediaService] Opening (gen $generation): $safeUrl',
+        name: 'MediaService');
     dev.log('[MediaService] Type: $_currentContentType', name: 'MediaService');
     // ignore: avoid_print
     print('=== MEDIA URL  === $safeUrl');
@@ -134,10 +157,18 @@ class MediaService extends ChangeNotifier {
 
       try {
         await ctrl.initialize();
+
+        // Another _openUrl() call arrived while we were initialising — discard.
+        if (generation != _openGeneration) {
+          ctrl.dispose();
+          dev.log('[MediaService] Stale open discarded (gen $generation)',
+              name: 'MediaService');
+          return;
+        }
+
         dev.log('[MediaService] ExoPlayer OK (attempt ${attempt + 1}) — '
             'duration: ${ctrl.value.duration}', name: 'MediaService');
 
-        final oldCtrl = _controller;
         _controller = ctrl;
         _duration   = ctrl.value.duration;
         _position   = Duration.zero;
@@ -153,19 +184,17 @@ class MediaService extends ChangeNotifier {
         isBufferingNotifier.value = false;
         _startPositionPollTimer();
 
-        if (oldCtrl != null) {
-          oldCtrl.removeListener(_onControllerUpdate);
-          oldCtrl.dispose();
-        }
         return; // success — stop trying
       } catch (e) {
         ctrl.dispose();
         dev.log('[MediaService] Attempt ${attempt + 1} failed: $e',
             name: 'MediaService');
         if (attempt == attempts.length - 1) {
-          // All attempts exhausted
-          isBufferingNotifier.value = false;
-          _setError('No se pudo abrir el stream.\nURL: $safeUrl\n$e');
+          // All attempts exhausted — only report error if we're still current.
+          if (generation == _openGeneration) {
+            isBufferingNotifier.value = false;
+            _setError('No se pudo abrir el stream.\nURL: $safeUrl\n$e');
+          }
         }
       }
     }
@@ -188,6 +217,11 @@ class MediaService extends ChangeNotifier {
     // Buffering
     if (isBufferingNotifier.value != val.isBuffering) {
       isBufferingNotifier.value = val.isBuffering;
+      if (!val.isBuffering) {
+        // Seek completed — cancel the safety timeout.
+        _seekTimeoutTimer?.cancel();
+        _seekTimeoutTimer = null;
+      }
     }
 
     // Error
@@ -395,9 +429,20 @@ class MediaService extends ChangeNotifier {
   }
 
   Future<void> seek(Duration position) async {
+    // Show spinner immediately and guard against ExoPlayer not firing isBuffering.
+    isBufferingNotifier.value = true;
+    _seekTimeoutTimer?.cancel();
+    _seekTimeoutTimer = Timer(const Duration(seconds: 10), () {
+      isBufferingNotifier.value = false;
+      dev.log('[MediaService] Seek timeout — forced buffering clear',
+          name: 'MediaService');
+    });
     try {
       await _controller?.seekTo(position);
     } catch (e) {
+      _seekTimeoutTimer?.cancel();
+      _seekTimeoutTimer = null;
+      isBufferingNotifier.value = false;
       dev.log('[MediaService] Seek error: $e', name: 'MediaService');
     }
   }

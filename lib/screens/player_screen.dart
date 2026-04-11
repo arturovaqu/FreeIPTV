@@ -74,7 +74,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // ── UI state ───────────────────────────────────────────────────────────────
   bool    _controlsVisible  = true;
   bool    _showVolumeSlider = false;
-  bool    _isBuffering      = false;
   bool    _isFullscreen     = false;
   bool    _subtitlesEnabled = false;
   String? _error;
@@ -89,7 +88,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   int     _nextEpCountdown  = 10;
 
   // ── Listeners ──────────────────────────────────────────────────────────────
-  late final VoidCallback _bufferingListener;
   late final VoidCallback _completedListener;
   late final VoidCallback _errorListener;
   late final VoidCallback _subtitleListener;
@@ -163,7 +161,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _hideTimer?.cancel();
     _nextEpTimer?.cancel();
     _volumeHideTimer?.cancel();
-    _media.isBufferingNotifier.removeListener(_bufferingListener);
     _media.completedNotifier.removeListener(_completedListener);
     _media.errorNotifier.removeListener(_errorListener);
     _media.subtitlesEnabledNotifier.removeListener(_subtitleListener);
@@ -218,14 +215,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _startPlaybackAsync() async {
-    switch (_type) {
-      case ContentType.TV:
-        await _media.playChannel(widget.channel!);
-        return; // live TV: no position restore
-      case ContentType.SERIES:
-        await _media.playSeries(widget.series!, widget.season!, widget.episode!);
-      case ContentType.MOVIES:
-        await _media.playMovie(widget.movie!);
+    try {
+      switch (_type) {
+        case ContentType.TV:
+          await _media.playChannel(widget.channel!);
+          return; // live TV: no position restore
+        case ContentType.SERIES:
+          await _media.playSeries(
+              widget.series!, widget.season!, widget.episode!);
+        case ContentType.MOVIES:
+          await _media.playMovie(widget.movie!);
+      }
+    } catch (e) {
+      dev.log('[PlayerScreen] Unexpected playback error: $e',
+          name: 'PlayerScreen');
+      if (mounted) setState(() => _error = 'Error inesperado: $e');
+      return;
     }
 
     if (!mounted) return;
@@ -298,12 +303,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // ── Listeners ──────────────────────────────────────────────────────────────
 
   void _setupListeners() {
-    // Buffering
-    _bufferingListener = () {
-      if (mounted) setState(() => _isBuffering = _media.isBufferingNotifier.value);
-    };
-    _media.isBufferingNotifier.addListener(_bufferingListener);
-
     // Error
     _errorListener = () {
       final err = _media.error;
@@ -515,17 +514,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
             Positioned.fill(child: _buildGestureLayer()),
 
             // ── 3. Buffering spinner ──────────────────────────────────────
-            if (_isBuffering && _error == null)
-              const Center(
-                child: SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    color: Colors.white70,
+            ValueListenableBuilder<bool>(
+              valueListenable: _media.isBufferingNotifier,
+              builder: (_, isBuffering, __) {
+                if (!isBuffering || _error != null) {
+                  return const SizedBox.shrink();
+                }
+                return const Center(
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: Colors.white70,
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
+            ),
 
             // ── 4. Controls overlay ───────────────────────────────────────
             if (_error == null)
@@ -595,8 +601,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _buildTopBar(device),
-          _buildProgressBar(),
-          _buildBottomBar(device),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildProgressBar(),
+              _buildBottomBar(device),
+            ],
+          ),
         ],
       ),
     );
