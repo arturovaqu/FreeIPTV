@@ -76,25 +76,6 @@
                     }
                 },
                 {
-                    "source": "D:\\PERSONAL\\Dinero\\IPTV\\android\\app\\src\\main\\res\\values\\styles.xml",
-                    "from": {
-                        "startLines": "3,8",
-                        "startColumns": "4,4",
-                        "startOffsets": "127,370",
-                        "endLines": "5,10",
-                        "endColumns": "12,12",
-                        "endOffsets": "294,534"
-                    },
-                    "to": {
-                        "startLines": "191,194",
-                        "startColumns": "4,4",
-                        "startOffsets": "11662,11834",
-                        "endLines": "193,196",
-                        "endColumns": "12,12",
-                        "endOffsets": "11829,11998"
-                    }
-                },
-                {
                     "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\066d25a47d55b1ab616dddb36b779fa4\\transformed\\activity-1.8.1\\res\\values\\values.xml",
                     "from": {
                         "startLines": "2,3",
@@ -109,6 +90,25 @@
                         "startOffsets": "6643,7652",
                         "endColumns": "41,59",
                         "endOffsets": "6680,7707"
+                    }
+                },
+                {
+                    "source": "D:\\FreeIPTV\\android\\app\\src\\main\\res\\values\\styles.xml",
+                    "from": {
+                        "startLines": "3,8",
+                        "startColumns": "4,4",
+                        "startOffsets": "130,378",
+                        "endLines": "5,10",
+                        "endColumns": "12,12",
+                        "endOffsets": "299,544"
+                    },
+                    "to": {
+                        "startLines": "191,194",
+                        "startColumns": "4,4",
+                        "startOffsets": "11662,11834",
+                        "endLines": "193,196",
+                        "endColumns": "12,12",
+                        "endOffsets": "11829,11998"
                     }
                 },
                 {

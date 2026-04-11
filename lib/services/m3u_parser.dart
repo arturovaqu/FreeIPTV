@@ -1,8 +1,10 @@
 import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
+import '../utils/config.dart';
 
 const _uuid = Uuid();
 
@@ -77,13 +79,18 @@ const _liveStreamPathKw = <String>['/live/', '/iptv/', '/stream/'];
 /// URL file extensions that indicate a VOD file (high-confidence signal).
 const _vodFileExts = <String>['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv'];
 
-/// Returns true if [urlLower] ends with one of [exts] or has it before a '?'
-bool _urlHasExt(String urlLower, List<String> exts) {
-  // Strip query string for extension check
-  final path = urlLower.contains('?')
-      ? urlLower.substring(0, urlLower.indexOf('?'))
-      : urlLower;
-  return exts.any((e) => path.endsWith(e));
+bool _hasAnyExtension(String segment) {
+  if (!segment.contains('.')) return false;
+  final parts = segment.split('.');
+  if (parts.length < 2) return false;
+  final ext = parts.last.toLowerCase();
+  // Only count as extension if it's 2-4 chars (common video exts)
+  return ext.length >= 2 && ext.length <= 4;
+}
+
+bool _urlHasExt(String url, List<String> exts) {
+  final low = url.toLowerCase();
+  return exts.any((e) => low.endsWith(e) || low.contains('$e?'));
 }
 
 // ── Classification result ────────────────────────────────────────────────────
@@ -114,22 +121,31 @@ class M3UParser {
   static Future<Map<String, List<dynamic>>> loadPlaylistFromURL(
       String url) async {
     final content = await fetchM3UContent(url);
-    return parseM3U(content);
+    // Use background Isolate to parse large data (prevent UI lag)
+    return compute(parseM3U, content);
   }
 
   static Future<String> fetchM3UContent(String url) async {
-    dev.log('[M3UParser] Fetching: $url', name: 'M3UParser');
+    final cleanUrl = url.trim();
+    dev.log('[M3UParser] Fetching: $cleanUrl', name: 'M3UParser');
     try {
+      final uri = Uri.parse(Uri.encodeFull(cleanUrl));
       final response = await http
-          .get(Uri.parse(url), headers: {
+          .get(uri, headers: {
             'Accept': '*/*',
-            'User-Agent': 'Mozilla/5.0',
+            'User-Agent': AppConfig.userAgent,
           })
-          .timeout(const Duration(seconds: 180));
+          .timeout(AppConfig.fetchTimeout);
 
       if (response.statusCode != 200) {
+        if (response.statusCode == 502 || response.statusCode == 503) {
+          throw M3UFetchException(
+            'El servidor del proveedor está sobrecargado (Error ${response.statusCode}). Prueba en unos segundos.',
+            statusCode: response.statusCode,
+          );
+        }
         throw M3UFetchException(
-          'HTTP ${response.statusCode} for $url',
+          'Error HTTP ${response.statusCode} al descargar la lista.',
           statusCode: response.statusCode,
         );
       }
@@ -139,10 +155,12 @@ class M3UParser {
         name: 'M3UParser',
       );
       return response.body;
+    } on FormatException catch (e) {
+      throw M3UFetchException('La URL no tiene un formato válido: $e');
     } on M3UFetchException {
       rethrow;
     } catch (e) {
-      throw M3UFetchException('Failed to fetch M3U: $e');
+      throw M3UFetchException('No se pudo conectar con el servidor: $e');
     }
   }
 
@@ -409,16 +427,20 @@ class M3UParser {
     }
 
     // 3. Live stream URL → TV regardless of group-title.
-    //    a) extension (.m3u8 / .ts / .m3u) — highest confidence
-    //    b) path segment (/live/ /iptv/ /stream/) — xtream-codes style:
-    //       http://host:8080/live/user/pass/channel_id
     if (_urlHasExt(urlLower, _liveStreamExts)) return _Kind.tv;
     if (_liveStreamPathKw.any((kw) => urlLower.contains(kw))) return _Kind.tv;
+    
+    // Pattern: /user/pass/id (no extension) -> Xtream live
+    // We check if the path has 3 segments and no extension.
+    try {
+      final uri = Uri.parse(urlLower);
+      final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+      if (segments.length == 3 && !_hasAnyExtension(segments.last)) {
+         return _Kind.tv;
+      }
+    } catch (_) {}
 
     // 4. VOD file extension → narrow down to series or movie.
-    //    Only here (where the URL already proves it's a file) do we trust
-    //    group-title keyword/substring matching for movies — avoids false
-    //    positives on live-TV groups like "BeIN Movies HD" or "AR-MOVIES".
     if (_urlHasExt(urlLower, _vodFileExts)) {
       // Series indicators take priority within VOD files
       if (_seriesGroupKw.any((kw) => groupLower.contains(kw))) {

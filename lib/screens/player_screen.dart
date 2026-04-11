@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 import '../models/models.dart';
 import '../services/media_service.dart';
@@ -12,6 +13,7 @@ import '../services/progress_service.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
+import '../widgets/professional_player.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PlayerScreen
@@ -404,8 +406,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _toggleSubtitles() {
-    _media.toggleSubtitles();
-    _showControls();
+    if (StorageService.instance.useProfessionalMotor()) {
+      _showTrackSelector();
+    } else {
+      _media.toggleSubtitles();
+      _showControls();
+    }
+  }
+
+  void _showTrackSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => const TrackSelectorModal(),
+    );
   }
 
   void _showEndOfSeriesDialog() {
@@ -499,22 +514,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           children: [
             // ── 1. Video ──────────────────────────────────────────────────
             Positioned.fill(
-              child: ValueListenableBuilder<VideoPlayerController?>(
-                valueListenable: _media.videoControllerNotifier,
-                builder: (_, ctrl, __) {
-                  if (ctrl == null || !ctrl.value.isInitialized) {
-                    return const SizedBox.shrink();
-                  }
-                  return Center(
-                    child: AspectRatio(
-                      aspectRatio: ctrl.value.aspectRatio > 0
-                          ? ctrl.value.aspectRatio
-                          : 16 / 9,
-                      child: VideoPlayer(ctrl),
-                    ),
-                  );
-                },
-              ),
+              child: _buildVideoRenderer(),
             ),
 
             // ── 2. Gesture layer ──────────────────────────────────────────
@@ -559,6 +559,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildVideoRenderer() {
+    if (StorageService.instance.useProfessionalMotor()) {
+      return ValueListenableBuilder<VideoController?>(
+        valueListenable: _media.mediaKitControllerNotifier,
+        builder: (_, ctrl, __) {
+          if (ctrl == null) return const SizedBox.shrink();
+          return ProfessionalPlayer(controller: ctrl);
+        },
+      );
+    } else {
+      return ValueListenableBuilder<VideoPlayerController?>(
+        valueListenable: _media.videoControllerNotifier,
+        builder: (_, ctrl, __) {
+          if (ctrl == null || !ctrl.value.isInitialized) return const SizedBox.shrink();
+          return Center(
+            child: AspectRatio(
+              aspectRatio: ctrl.value.aspectRatio > 0 ? ctrl.value.aspectRatio : 16 / 9,
+              child: VideoPlayer(ctrl),
+            ),
+          );
+        },
+      );
+    }
   }
 
   // ── Gesture layer ─────────────────────────────────────────────────────────

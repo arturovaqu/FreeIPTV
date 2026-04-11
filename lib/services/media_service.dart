@@ -3,8 +3,12 @@ import 'dart:developer' as dev;
 
 import 'package:flutter/foundation.dart';
 import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
+import 'package:http/http.dart' as http;
 
 import '../models/models.dart';
+import '../utils/config.dart';
 import 'progress_service.dart';
 import 'storage_service.dart';
 
@@ -19,6 +23,8 @@ class MediaService extends ChangeNotifier {
   // ── Player ───────────────────────────────────────────────────────────────────
 
   VideoPlayerController? _controller;
+  Player?                _mediaKitPlayer;
+  VideoController?       _mediaKitVideoController;
   Timer?                 _progressTimer;
   Timer?                 _positionPollTimer;
 
@@ -40,8 +46,10 @@ class MediaService extends ChangeNotifier {
   // ── ValueNotifiers ──────────────────────────────────────────────────────────
 
   /// Fires whenever a new VideoPlayerController is ready for rendering.
-  final videoControllerNotifier   = ValueNotifier<VideoPlayerController?>(null);
-  final isPlayingNotifier          = ValueNotifier<bool>(false);
+  final videoControllerNotifier     = ValueNotifier<VideoPlayerController?>(null);
+  final mediaKitPlayerNotifier      = ValueNotifier<Player?>(null);
+  final mediaKitControllerNotifier  = ValueNotifier<VideoController?>(null);
+  final isPlayingNotifier           = ValueNotifier<bool>(false);
   final currentContentTypeNotifier = ValueNotifier<ContentType?>(null);
   final currentChannelNotifier     = ValueNotifier<Channel?>(null);
   final currentSeriesNotifier      = ValueNotifier<Series?>(null);
@@ -54,6 +62,12 @@ class MediaService extends ChangeNotifier {
   final isBufferingNotifier        = ValueNotifier<bool>(false);
   final completedNotifier          = ValueNotifier<bool>(false);
   final subtitlesEnabledNotifier   = ValueNotifier<bool>(false);
+
+  // -- Track Notifiers (Pro Engine Only) --
+  final audioTracksNotifier        = ValueNotifier<List<AudioTrack>>([]);
+  final subtitleTracksNotifier     = ValueNotifier<List<SubtitleTrack>>([]);
+  final activeAudioTrackNotifier   = ValueNotifier<AudioTrack?>(null);
+  final activeSubtitleTrackNotifier = ValueNotifier<SubtitleTrack?>(null);
 
   // ── Getters ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +84,8 @@ class MediaService extends ChangeNotifier {
   String?                get error              => _error;
   bool                   get subtitlesEnabled   => _subtitlesEnabled;
   VideoPlayerController? get videoController    => _controller;
+  Player?                get mediaKitPlayer     => _mediaKitPlayer;
+  VideoController?       get mVideoController   => _mediaKitVideoController;
 
   double get progress =>
       _duration.inMilliseconds > 0
@@ -79,7 +95,8 @@ class MediaService extends ChangeNotifier {
   // ── Init ─────────────────────────────────────────────────────────────────────
 
   Future<void> initialize() async {
-    dev.log('[MediaService] Initialized — backend: ExoPlayer (video_player)',
+    final usePro = StorageService.instance.useProfessionalMotor();
+    dev.log('[MediaService] Initialized — backend: ${usePro ? 'MediaKit (Pro)' : 'ExoPlayer (Std)'}',
         name: 'MediaService');
   }
 
@@ -90,12 +107,9 @@ class MediaService extends ChangeNotifier {
     'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
         '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Referer':        'http://iota.proxy-pass.vip/',
-    'Origin':         'http://iota.proxy-pass.vip',
     'Accept':         '*/*',
     'Accept-Language': 'es-ES,es;q=0.9',
     'Cache-Control':  'no-cache',
-    'Pragma':         'no-cache',
     'Connection':     'keep-alive',
   };
 
@@ -112,60 +126,129 @@ class MediaService extends ChangeNotifier {
     completedNotifier.value   = false;
     isBufferingNotifier.value = true;
 
-    // Encode URL to handle spaces and special characters
-    final safeUrl = Uri.encodeFull(url);
+    final cleanUrl = url.trim();
+    final safeUrl  = Uri.encodeFull(cleanUrl);
 
     dev.log('[MediaService] Opening: $safeUrl', name: 'MediaService');
     dev.log('[MediaService] Type: $_currentContentType', name: 'MediaService');
-    // ignore: avoid_print
-    print('=== MEDIA URL  === $safeUrl');
-    // ignore: avoid_print
-    print('=== MEDIA TYPE === $_currentContentType');
 
-    // Attempt 1: with Chrome UA headers
-    // Attempt 2: no headers (some servers block specific UA for certain categories)
-    final attempts = [_headers, <String, String>{}];
+    if (StorageService.instance.useProfessionalMotor()) {
+      await _openUrlPro(safeUrl);
+    } else {
+      await _openUrlStd(safeUrl);
+    }
+  }
+
+  Future<void> _openUrlPro(String safeUrl) async {
+    try {
+      if (_mediaKitPlayer == null) {
+        _mediaKitPlayer = Player();
+        _mediaKitVideoController = await VideoController.create(_mediaKitPlayer!);
+        
+        // Listeners for Pro Engine
+        _mediaKitPlayer!.stream.playing.listen((v) => isPlayingNotifier.value = v);
+        _mediaKitPlayer!.stream.duration.listen((v) => durationNotifier.value = v);
+        _mediaKitPlayer!.stream.position.listen((v) => positionNotifier.value = v);
+        _mediaKitPlayer!.stream.buffering.listen((v) => isBufferingNotifier.value = v);
+        _mediaKitPlayer!.stream.error.listen((v) => _handleError(v.toString()));
+        _mediaKitPlayer!.stream.completed.listen((v) {
+          if (v) completedNotifier.value = true;
+        });
+
+        // Track listeners
+        _mediaKitPlayer!.stream.tracks.listen((v) {
+          audioTracksNotifier.value = v.audio;
+          subtitleTracksNotifier.value = v.subtitle;
+        });
+        _mediaKitPlayer!.stream.track.listen((v) {
+          activeAudioTrackNotifier.value = v.audio;
+          activeSubtitleTrackNotifier.value = v.subtitle;
+        });
+      }
+
+      // Reset track notifiers for new stream
+      audioTracksNotifier.value = [];
+      subtitleTracksNotifier.value = [];
+
+      await _mediaKitPlayer!.open(Media(safeUrl, httpHeaders: _headers), play: true);
+      
+      // Auto-select Spanish/English audio if available
+      _mediaKitPlayer!.stream.tracks.first.then((tracks) {
+        final audio = tracks.audio;
+        final spanish = audio.where((t) => (t.language?.toLowerCase().contains('es') ?? false) || (t.title?.toLowerCase().contains('spa') ?? false)).firstOrNull;
+        if (spanish != null) {
+          _mediaKitPlayer!.setAudioTrack(spanish);
+        } else {
+          final english = audio.where((t) => (t.language?.toLowerCase().contains('en') ?? false) || (t.title?.toLowerCase().contains('eng') ?? false)).firstOrNull;
+          if (english != null) _mediaKitPlayer!.setAudioTrack(english);
+        }
+      });
+
+      mediaKitPlayerNotifier.value = _mediaKitPlayer;
+      mediaKitControllerNotifier.value = _mediaKitVideoController;
+      isBufferingNotifier.value = false;
+      dev.log('[MediaService] Pro Engine started: $safeUrl', name: 'MediaService');
+    } catch (e) {
+      _handleError('Error Pro: $e');
+    }
+  }
+
+  Future<void> _openUrlStd(String safeUrl) async {
+    // Attempt 1: Standard headers (works for TV/Series)
+    // Attempt 2: Only User-Agent (works better for some VOD)
+    // Attempt 3: No headers
+    final attempts = [
+      _headers,
+      <String, String>{'User-Agent': AppConfig.userAgent},
+      <String, String>{},
+    ];
 
     for (int attempt = 0; attempt < attempts.length; attempt++) {
       final ctrl = VideoPlayerController.networkUrl(
         Uri.parse(safeUrl),
-        httpHeaders: attempts[attempt],
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        httpHeaders: {
+          'User-Agent': AppConfig.userAgent,
+          'Accept': '*/*',
+          ...attempts[attempt],
+        },
       );
 
       try {
-        await ctrl.initialize();
-        dev.log('[MediaService] ExoPlayer OK (attempt ${attempt + 1}) — '
-            'duration: ${ctrl.value.duration}', name: 'MediaService');
-
+        await ctrl.initialize().timeout(const Duration(seconds: 45));
+        
+        // Success
         final oldCtrl = _controller;
         _controller = ctrl;
-        _duration   = ctrl.value.duration;
-        _position   = Duration.zero;
-
-        durationNotifier.value = _duration;
-        positionNotifier.value = Duration.zero;
-
-        ctrl.addListener(_onControllerUpdate);
-        await ctrl.setVolume(_volume / 100.0);
-        await ctrl.play();
-
-        videoControllerNotifier.value = ctrl;
+        videoControllerNotifier.value = _controller;
         isBufferingNotifier.value = false;
+        
+        if (oldCtrl != null) await oldCtrl.dispose();
+        
+        await _controller!.play();
+        _startProgressTimer();
         _startPositionPollTimer();
+        
+        _controller!.addListener(() {
+          if (_controller == null) return;
+          isPlayingNotifier.value = _controller!.value.isPlaying;
+          durationNotifier.value  = _controller!.value.duration;
+          positionNotifier.value  = _controller!.value.position;
+          isBufferingNotifier.value = _controller!.value.isBuffering;
+          
+          if (_controller!.value.hasError) {
+             _handleError(_controller!.value.errorDescription ?? 'Error Std');
+          }
+          if (_controller!.value.position >= _controller!.value.duration && _controller!.value.duration > Duration.zero) {
+             completedNotifier.value = true;
+          }
+        });
 
-        if (oldCtrl != null) {
-          oldCtrl.removeListener(_onControllerUpdate);
-          oldCtrl.dispose();
-        }
-        return; // success — stop trying
+        return; // Success, exit attempts
       } catch (e) {
-        ctrl.dispose();
-        dev.log('[MediaService] Attempt ${attempt + 1} failed: $e',
-            name: 'MediaService');
+        await ctrl.dispose();
         if (attempt == attempts.length - 1) {
-          // All attempts exhausted
-          isBufferingNotifier.value = false;
-          _setError('No se pudo abrir el stream.\nURL: $safeUrl\n$e');
+          _handleError('Fallo tras todos los intentos: $e');
         }
       }
     }
@@ -368,18 +451,30 @@ class MediaService extends ChangeNotifier {
   // ── Playback controls ────────────────────────────────────────────────────────
 
   Future<void> play() async {
-    try {
-      await _controller?.play();
-    } catch (e) {
-      _setError('Error al reproducir: $e');
+    if (_mediaKitPlayer != null) {
+      await _mediaKitPlayer!.play();
+    } else if (_controller != null) {
+      await _controller!.play();
     }
   }
 
   Future<void> pause() async {
-    try {
-      await _controller?.pause();
-    } catch (e) {
-      _setError('Error al pausar: $e');
+    if (_mediaKitPlayer != null) {
+      await _mediaKitPlayer!.pause();
+    } else if (_controller != null) {
+      await _controller!.pause();
+    }
+  }
+
+  Future<void> togglePlayPause() async {
+    if (_mediaKitPlayer != null) {
+      await _mediaKitPlayer!.playOrPause();
+    } else if (_controller != null) {
+      if (_controller!.value.isPlaying) {
+        await _controller!.pause();
+      } else {
+        await _controller!.play();
+      }
     }
   }
 
@@ -387,16 +482,21 @@ class MediaService extends ChangeNotifier {
     _cancelProgressTimer();
     _cancelPositionPollTimer();
     try {
-      await _controller?.pause();
-      await _controller?.seekTo(Duration.zero);
-    } catch (e) {
-      _setError('Error al detener: $e');
-    }
-  }
-
-  Future<void> seek(Duration position) async {
+      if (_mediaKitPlayer != null) {
+        await _mediaKitPlayer!.stop();
+      } else if (_controller != null) {
+        await _controller!.pause();
+        await _controller!.seekTo(Duration.zero);
+      }
+  Future<void> seekTo(Duration position) async {
     try {
-      await _controller?.seekTo(position);
+      if (_mediaKitPlayer != null) {
+        await _mediaKitPlayer!.seek(position);
+      } else if (_controller != null) {
+        await _controller!.seekTo(position);
+      }
+      _position = position;
+      positionNotifier.value = position;
     } catch (e) {
       dev.log('[MediaService] Seek error: $e', name: 'MediaService');
     }
@@ -415,12 +515,41 @@ class MediaService extends ChangeNotifier {
     }
   }
 
-  /// Subtitle toggle — ExoPlayer renders embedded MKV subs automatically.
-  /// video_player doesn't expose track selection, so this only updates the
-  /// UI indicator.
   Future<void> toggleSubtitles() async {
+    if (_mediaKitPlayer != null) {
+       // media_kit handles this via track selection
+       // If currently disabled, we enable the first available track
+       final tracks = _mediaKitPlayer!.state.tracks.subtitle;
+       if (_subtitlesEnabled) {
+         _mediaKitPlayer!.setSubtitleTrack(SubtitleTrack.no());
+       } else if (tracks.isNotEmpty) {
+         _mediaKitPlayer!.setSubtitleTrack(tracks.first);
+       }
+    }
     _subtitlesEnabled = !_subtitlesEnabled;
     subtitlesEnabledNotifier.value = _subtitlesEnabled;
+  }
+
+  // ── Track Selection (Pro Engine only) ────────────────────────────────────────
+
+  List<AudioTrack> getAvailableAudioTracks() {
+    return _mediaKitPlayer?.state.tracks.audio ?? [];
+  }
+
+  Future<void> setAudioTrack(AudioTrack track) async {
+    await _mediaKitPlayer?.setAudioTrack(track);
+    notifyListeners();
+  }
+
+  List<SubtitleTrack> getAvailableSubtitleTracks() {
+    return _mediaKitPlayer?.state.tracks.subtitle ?? [];
+  }
+
+  Future<void> setSubtitleTrack(SubtitleTrack track) async {
+    await _mediaKitPlayer?.setSubtitleTrack(track);
+    _subtitlesEnabled = track.id != 'no';
+    subtitlesEnabledNotifier.value = _subtitlesEnabled;
+    notifyListeners();
   }
 
   // ── Progress timer ───────────────────────────────────────────────────────────

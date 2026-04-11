@@ -9,6 +9,8 @@ import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
 import 'player_screen.dart';
+import '../services/metadata_service.dart';
+import 'movies_list_screen.dart'; // For _MetaChip shared style if needed, though they are usually repeated in such files
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SeriesListScreen
@@ -829,51 +831,101 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
 // Shared small widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _Poster extends StatelessWidget {
-  final String?  url;
-  final String   name;
-  final BoxFit   fit;
+class _Poster extends StatefulWidget {
+  final String? url;
+  final String  name;
+  final BoxFit  fit;
 
   const _Poster({this.url, required this.name, this.fit = BoxFit.cover});
 
   @override
+  State<_Poster> createState() => _PosterState();
+}
+
+class _PosterState extends State<_Poster> {
+  String? _effectiveUrl;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _effectiveUrl = widget.url;
+    if (_effectiveUrl == null || _effectiveUrl!.isEmpty) {
+      _fetchMetadata();
+    }
+  }
+
+  Future<void> _fetchMetadata() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    // Fetch specifically for series/TV type
+    final meta = await MetadataService.instance.fetchMetadata(widget.name, isMovie: false);
+    if (mounted && meta != null && meta['poster'] != null) {
+      setState(() {
+        _effectiveUrl = meta['poster'];
+        _loading = false;
+      });
+    } else {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (url != null && url!.isNotEmpty) {
+    if (_effectiveUrl != null && _effectiveUrl!.isNotEmpty) {
       return Image.network(
-        url!,
-        fit: fit,
-        errorBuilder: (_, __, ___) => _PosterFallback(name: name),
+        _effectiveUrl!,
+        fit: widget.fit,
+        loadingBuilder: (ctx, child, progress) {
+          if (progress == null) return child;
+          return _PosterFallback(name: widget.name, showProgress: true);
+        },
+        errorBuilder: (_, __, ___) => _PosterFallback(name: widget.name),
       );
     }
-    return _PosterFallback(name: name);
+    return _PosterFallback(name: widget.name, showProgress: _loading);
   }
 }
 
 class _PosterFallback extends StatelessWidget {
   final String name;
-  const _PosterFallback({required this.name});
+  final bool showProgress;
+  const _PosterFallback({required this.name, this.showProgress = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.surfaceVariant,
       alignment: Alignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          const Icon(Icons.video_library,
-              color: AppColors.textDisabled, size: 40),
-          const SizedBox(height: AppSpacing.sm),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-            child: Text(
-              name,
-              style: AppTextStyles.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.video_library, color: AppColors.textDisabled, size: 40),
+              const SizedBox(height: AppSpacing.sm),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                child: Text(
+                  name,
+                  style: AppTextStyles.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
+          if (showProgress)
+            const Positioned(
+              bottom: 20,
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+              ),
+            ),
         ],
       ),
     );

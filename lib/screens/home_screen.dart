@@ -15,6 +15,7 @@ import 'search_screen.dart';
 import 'series_list_screen.dart';
 import 'settings_screen.dart';
 import 'tv_list_screen.dart';
+import 'dashboard_screen.dart';
 
 const _uuid = Uuid();
 
@@ -34,10 +35,11 @@ class _HomeScreenState extends State<HomeScreen>
   late final TabController _tabController;
 
   static const _tabs = [
-    (icon: Icons.live_tv,        label: 'Canales'),
-    (icon: Icons.video_library,  label: 'Series'),
-    (icon: Icons.movie,          label: 'Películas'),
-    (icon: Icons.search,         label: 'Buscar'),
+    (icon: Icons.dashboard_outlined, label: 'Inicio'),
+    (icon: Icons.live_tv,            label: 'Canales'),
+    (icon: Icons.video_library,      label: 'Series'),
+    (icon: Icons.movie,              label: 'Películas'),
+    (icon: Icons.search,             label: 'Buscar'),
   ];
 
   @override
@@ -61,29 +63,121 @@ class _HomeScreenState extends State<HomeScreen>
         final playlists   = storage.getPlaylists();
         final active      = storage.getActivePlaylist();
         final hasPlaylist = playlists.isNotEmpty;
+        final device      = getDeviceInfo(context);
+        final isLarge     = device.isTV || device.isDesktop || device.isTablet;
+
+        if (!hasPlaylist) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            body: _buildEmptyState(context, storage),
+          );
+        }
 
         return Scaffold(
           backgroundColor: AppColors.background,
-          appBar: _buildAppBar(context, storage, playlists, active, hasPlaylist),
-          drawer: _buildDrawer(context, storage, playlists, active),
-          body: Column(
+          drawer: isLarge ? null : _buildDrawer(context, storage, playlists, active),
+          body: Row(
             children: [
-              _buildTabBar(),
+              if (isLarge) _buildSidebar(context, storage, playlists, active),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
+                child: Column(
                   children: [
-                    TVListScreen(playlist: active),
-                    SeriesListScreen(playlist: active),
-                    MoviesListScreen(playlist: active),
-                    SearchScreen(playlist: active),
+                    _buildAppBar(context, storage, playlists, active, hasPlaylist),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          DashboardScreen(playlist: active),
+                          TVListScreen(playlist: active),
+                          SeriesListScreen(playlist: active),
+                          MoviesListScreen(playlist: active),
+                          SearchScreen(playlist: active),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
+          bottomNavigationBar: isLarge
+              ? null
+              : _buildBottomNav(),
         );
       },
+    );
+  }
+
+  Widget _buildSidebar(
+    BuildContext context,
+    StorageService storage,
+    List<Playlist> playlists,
+    Playlist? active,
+  ) {
+    return Container(
+      width: 250,
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(right: BorderSide(color: AppColors.border, width: 1)),
+      ),
+      child: Column(
+        children: [
+          // Header / Profile Switcher
+          _SidebarProfileHeader(
+            active: active,
+            playlists: playlists,
+            onAdd: () => _showAddPlaylistDialog(context, storage),
+            onSelect: (p) => storage.setActivePlaylist(p.id),
+          ),
+          const Divider(color: AppColors.border, height: 1),
+          // Nav Items
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              itemCount: _tabs.length,
+              itemBuilder: (ctx, i) {
+                final isSelected = _tabController.index == i;
+                return _SidebarItem(
+                  icon: _tabs[i].icon,
+                  label: _tabs[i].label,
+                  isSelected: isSelected,
+                  onTap: () => setState(() => _tabController.animateTo(i)),
+                );
+              },
+            ),
+          ),
+          // Settings at bottom
+          _SidebarItem(
+            icon: Icons.settings,
+            label: 'Ajustes',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: const UnderlineTabIndicator(
+          borderSide: BorderSide(color: AppColors.accent, width: 3),
+          insets: EdgeInsets.only(bottom: 44), // indicator at top
+        ),
+        labelColor: AppColors.accent,
+        unselectedLabelColor: AppColors.textSecondary,
+        labelStyle: AppTextStyles.labelMedium,
+        tabs: _tabs.map((t) => Tab(icon: Icon(t.icon), text: t.label)).toList(),
+      ),
     );
   }
 
@@ -284,6 +378,55 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 );
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, StorageService storage) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.add_to_queue,
+                size: 64,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            const Text(
+              'No hay Playlists',
+              style: AppTextStyles.displayMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'Agrega una URL M3U o escanea un código QR para empezar a disfrutar del mejor contenido en tu televisor.',
+              style: AppTextStyles.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            SizedBox(
+              width: 250,
+              child: ElevatedButton.icon(
+                onPressed: () => _showAddPlaylistDialog(context, storage),
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar Playlist'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                ),
+              ),
             ),
           ],
         ),
@@ -1038,6 +1181,193 @@ class _PrimaryButton extends StatelessWidget {
                   strokeWidth: 2, color: AppColors.textInverse),
             )
           : Text(label, style: AppTextStyles.labelLarge),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sidebar Components
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SidebarProfileHeader extends StatelessWidget {
+  final Playlist? active;
+  final List<Playlist> playlists;
+  final VoidCallback onAdd;
+  final Function(Playlist) onSelect;
+
+  const _SidebarProfileHeader({
+    required this.active,
+    required this.playlists,
+    required this.onAdd,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.accentGlow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.accent, width: 1.5),
+                ),
+                child: const Icon(Icons.person, color: AppColors.accent, size: 24),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      active?.name ?? 'Sin Playlist',
+                      style: AppTextStyles.labelLarge.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Perfil Activo',
+                      style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _PlaylistSwitcher(
+            active: active,
+            playlists: playlists,
+            onAdd: onAdd,
+            onSelect: onSelect,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaylistSwitcher extends StatelessWidget {
+  final Playlist? active;
+  final List<Playlist> playlists;
+  final VoidCallback onAdd;
+  final Function(Playlist) onSelect;
+
+  const _PlaylistSwitcher({
+    required this.active,
+    required this.playlists,
+    required this.onAdd,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<Playlist?>(
+      onSelected: (p) => p == null ? onAdd() : onSelect(p),
+      offset: const Offset(0, 4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: AppColors.surfaceVariant,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Cambiar Lista', style: AppTextStyles.labelMedium),
+            Icon(Icons.unfold_more, color: AppColors.textSecondary, size: 18),
+          ],
+        ),
+      ),
+      itemBuilder: (ctx) => [
+        ...playlists.map((p) => PopupMenuItem(
+              value: p,
+              child: Row(
+                children: [
+                  Icon(
+                    p.id == active?.id ? Icons.check_circle : Icons.circle_outlined,
+                    color: p.id == active?.id ? AppColors.accent : AppColors.textSecondary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(p.name, style: AppTextStyles.labelMedium),
+                ],
+              ),
+            )),
+        const PopupMenuDivider(),
+        const PopupMenuItem<Playlist?>(
+          value: null,
+          child: Row(
+            children: [
+              Icon(Icons.add, color: AppColors.success, size: 18),
+              const SizedBox(width: 12),
+              Text('Añadir Nueva', style: AppTextStyles.labelMedium),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SidebarItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SidebarItem({
+    required this.icon,
+    required this.label,
+    this.isSelected = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
+      child: Material(
+        color: isSelected ? AppColors.accentGlow : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              border: isSelected ? const Border(left: BorderSide(color: AppColors.accent, width: 3)) : null,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? AppColors.accent : AppColors.textSecondary,
+                  size: 20,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  label,
+                  style: AppTextStyles.labelLarge.copyWith(
+                    color: isSelected ? AppColors.accent : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

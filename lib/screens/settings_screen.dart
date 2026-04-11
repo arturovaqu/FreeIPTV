@@ -40,15 +40,30 @@ class SettingsScreen extends StatelessWidget {
                 margin: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
                     borderRadius: AppRadius.cardRadius),
-                child: SwitchListTile(
-                  title: const Text('Subtítulos por defecto',
-                      style: AppTextStyles.bodyLarge),
-                  subtitle: const Text(
-                      'Activar subtítulos automáticamente al reproducir',
-                      style: AppTextStyles.bodyMedium),
-                  value: defaultSubs,
-                  activeColor: AppColors.accent,
-                  onChanged: (v) => storage.setDefaultSubtitles(v),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Subtítulos por defecto',
+                          style: AppTextStyles.bodyLarge),
+                      subtitle: const Text(
+                          'Activar subtítulos automáticamente al reproducir',
+                          style: AppTextStyles.bodyMedium),
+                      value: defaultSubs,
+                      activeColor: AppColors.accent,
+                      onChanged: (v) => storage.setDefaultSubtitles(v),
+                    ),
+                    const Divider(height: 1, color: AppColors.border, indent: 16, endIndent: 16),
+                    SwitchListTile(
+                      title: const Text('Motor de Video Profesional',
+                          style: AppTextStyles.bodyLarge),
+                      subtitle: const Text(
+                          'Usa FFmpeg/mpv para mayor compatibilidad, audio múltiple y subtítulos avanzados',
+                          style: AppTextStyles.bodyMedium),
+                      value: storage.useProfessionalMotor(),
+                      activeColor: AppColors.accent,
+                      onChanged: (v) => storage.setProfessionalMotor(v),
+                    ),
+                  ],
                 ),
               ),
 

@@ -27,10 +27,10 @@ com.example.iptv_app-lifecycle-viewmodel-2.7.0-25 C:\Users\artur\.gradle\caches\
 com.example.iptv_app-packaged_res-26 C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\mobile_scanner-4.0.1\android\build\intermediates\packaged_res\release
 com.example.iptv_app-packaged_res-27 C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.17\android\build\intermediates\packaged_res\release
 com.example.iptv_app-packaged_res-28 C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\video_player_android-2.8.4\android\build\intermediates\packaged_res\release
-com.example.iptv_app-main-29 D:\PERSONAL\Dinero\IPTV\android\app\src\main\res
-com.example.iptv_app-release-30 D:\PERSONAL\Dinero\IPTV\android\app\src\release\res
-com.example.iptv_app-pngs-31 D:\PERSONAL\Dinero\IPTV\build\app\generated\res\pngs\release
-com.example.iptv_app-resValues-32 D:\PERSONAL\Dinero\IPTV\build\app\generated\res\resValues\release
-com.example.iptv_app-packageReleaseResources-33 D:\PERSONAL\Dinero\IPTV\build\app\intermediates\incremental\release\packageReleaseResources\merged.dir
-com.example.iptv_app-packageReleaseResources-34 D:\PERSONAL\Dinero\IPTV\build\app\intermediates\incremental\release\packageReleaseResources\stripped.dir
-com.example.iptv_app-merged_res-35 D:\PERSONAL\Dinero\IPTV\build\app\intermediates\merged_res\release
+com.example.iptv_app-main-29 D:\FreeIPTV\android\app\src\main\res
+com.example.iptv_app-release-30 D:\FreeIPTV\android\app\src\release\res
+com.example.iptv_app-pngs-31 D:\FreeIPTV\build\app\generated\res\pngs\release
+com.example.iptv_app-resValues-32 D:\FreeIPTV\build\app\generated\res\resValues\release
+com.example.iptv_app-packageReleaseResources-33 D:\FreeIPTV\build\app\intermediates\incremental\release\packageReleaseResources\merged.dir
+com.example.iptv_app-packageReleaseResources-34 D:\FreeIPTV\build\app\intermediates\incremental\release\packageReleaseResources\stripped.dir
+com.example.iptv_app-merged_res-35 D:\FreeIPTV\build\app\intermediates\merged_res\release

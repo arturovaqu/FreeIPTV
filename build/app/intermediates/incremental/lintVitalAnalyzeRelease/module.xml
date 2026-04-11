@@ -1,11 +1,11 @@
 <lint-module
     format="1"
-    dir="D:\PERSONAL\Dinero\IPTV\android\app"
+    dir="D:\FreeIPTV\android\app"
     name=":app"
     type="APP"
     maven="iptv_app:app:"
     agpVersion="8.2.2"
-    buildFolder="D:\PERSONAL\Dinero\IPTV\build\app"
+    buildFolder="D:\FreeIPTV\build\app"
     bootClassPath="C:\Users\artur\AppData\Local\Android\Sdk\platforms\android-36\android.jar;C:\Users\artur\AppData\Local\Android\Sdk\build-tools\34.0.0\core-lambda-stubs.jar"
     javaSourceLevel="1.8"
     compileTarget="android-36"

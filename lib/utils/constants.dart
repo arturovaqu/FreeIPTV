@@ -7,45 +7,50 @@ class AppColors {
   AppColors._();
 
   // Backgrounds
-  static const Color background     = Color(0xFF0A0A0F);
-  static const Color surface        = Color(0xFF13131A);
-  static const Color surfaceVariant = Color(0xFF1C1C26);
-  static const Color card           = Color(0xFF1E1E2A);
-  static const Color cardHover      = Color(0xFF252535);
+  static const Color background     = Color(0xFF07070B);
+  static const Color surface        = Color(0xFF0F0F16);
+  static const Color surfaceVariant = Color(0xFF161621);
+  static const Color card           = Color(0xFF191926);
+  static const Color cardHover      = Color(0xFF202030);
+
+  // Glassmorphism tokens
+  static const Color glassBase      = Color(0x1AFFFFFF);
+  static const Color glassStroke    = Color(0x33FFFFFF);
+  static const Color glassFill      = Color(0x0DFFFFFF);
 
   // Text
-  static const Color textPrimary    = Color(0xFFF0F0F5);
-  static const Color textSecondary  = Color(0xFF9090A8);
-  static const Color textDisabled   = Color(0xFF4A4A60);
-  static const Color textInverse    = Color(0xFF0A0A0F);
+  static const Color textPrimary    = Color(0xFFFFFFFF);
+  static const Color textSecondary  = Color(0xFFA0A0B0);
+  static const Color textDisabled   = Color(0xFF5A5A70);
+  static const Color textInverse    = Color(0xFF000000);
 
-  // Accents per content type
-  static const Color accentLive     = Color(0xFFE53935); // red — on-air feel
-  static const Color accentSeries   = Color(0xFF5C6BC0); // indigo
-  static const Color accentMovies   = Color(0xFFFFB300); // amber
+  // Accents - Curated vibrant palette
+  static const Color accentLive     = Color(0xFFFF3366); // Neon coral/red
+  static const Color accentSeries   = Color(0xFF6366F1); // Modern Indigo
+  static const Color accentMovies   = Color(0xFFFACC15); // Vibrant Yellow
 
-  // Global accent (navigation / focus)
-  static const Color accent         = Color(0xFF7C4DFF); // deep purple
-  static const Color accentDim      = Color(0xFF3D2680);
+  // Global accent - Electric Purple
+  static const Color accent         = Color(0xFF8B5CF6);
+  static const Color accentDim      = Color(0xFF5B21B6);
+  static const Color accentGlow     = Color(0x4D8B5CF6);
 
   // Borders / dividers
-  static const Color border         = Color(0xFF2A2A3A);
-  static const Color divider        = Color(0xFF1F1F2E);
+  static const Color border         = Color(0xFF252535);
+  static const Color divider        = Color(0xFF1A1A28);
 
   // Status
-  static const Color success        = Color(0xFF43A047);
-  static const Color warning        = Color(0xFFFFB300);
-  static const Color error          = Color(0xFFE53935);
-  static const Color info           = Color(0xFF1E88E5);
+  static const Color success        = Color(0xFF10B981);
+  static const Color warning        = Color(0xFFF59E0B);
+  static const Color error          = Color(0xFFEF4444);
+  static const Color info           = Color(0xFF3B82F6);
 
   // Overlays
-  static const Color overlay        = Color(0xCC000000);
-  static const Color shimmerBase    = Color(0xFF1E1E2A);
-  static const Color shimmerHighlight = Color(0xFF2C2C3E);
+  static const Color overlay        = Color(0xE6000000);
+  static const Color shadowColor    = Color(0x33000000);
 
   // Focused item (TV remote nav)
-  static const Color focusBorder    = Color(0xFF7C4DFF);
-  static const Color focusGlow      = Color(0x337C4DFF);
+  static const Color focusBorder    = Color(0xFF8B5CF6);
+  static const Color focusGlow      = Color(0x338B5CF6);
 }
 
 // ─────────────────────────────────────────────

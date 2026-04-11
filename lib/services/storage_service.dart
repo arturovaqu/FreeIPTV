@@ -8,9 +8,6 @@ import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SessionData
-// ─────────────────────────────────────────────────────────────────────────────
-
 class SessionData {
   final String deviceId;
   final DateTime lastActivity;
@@ -275,13 +272,11 @@ class StorageService extends ChangeNotifier {
     final activeId = _settings.get('activePlaylistId') as String?;
     if (activeId == null) return null;
     if (_playlistCache.containsKey(activeId)) return _playlistCache[activeId];
-    final raw = _playlists.get(activeId);
-    if (raw == null) return null;
     final sw = Stopwatch()..start();
     final pl = _decodePlaylist(raw as Map);
     _playlistCache[activeId] = pl;
-    // Build indices on first decode of the active playlist
-    _createSearchIndices(pl);
+    // Build indices in the background to prevent UI jank
+    _buildIndicesAsync(pl);
     dev.log('[StorageService] getActivePlaylist() decoded in ${sw.elapsedMilliseconds}ms — '
         '${pl.channels.length} ch, ${pl.series.length} series, ${pl.movies.length} movies',
         name: 'StorageService');
@@ -480,53 +475,66 @@ class StorageService extends ChangeNotifier {
     return _settings.get('defaultSubtitles', defaultValue: false) as bool;
   }
 
+  bool useProfessionalMotor() {
+    _assertInit();
+    return _settings.get('useProfessionalMotor', defaultValue: false) as bool;
+  }
+
+  Future<void> setProfessionalMotor(bool enabled) async {
+    _assertInit();
+    await _settings.put('useProfessionalMotor', enabled);
+    notifyListeners();
+  }
+
   // ── Search indices ───────────────────────────────────────────────────────────
 
-  /// Rebuilds all in-memory search indices from [pl].
-  /// Normalization is done once here so search queries never call regex per item.
-  void _createSearchIndices(Playlist pl) {
-    final sw = Stopwatch()..start();
+  bool _isIndexing = false;
+  bool get isIndexing => _isIndexing;
 
-    _channelNameIndex
-      ..clear()
-      ..addAll(pl.channels.map((c) => (_indexNormalize(c.name), c)));
-    _movieNameIndex
-      ..clear()
-      ..addAll(pl.movies.map((m) => (_indexNormalize(m.title), m)));
-    _seriesNameIndex
-      ..clear()
-      ..addAll(pl.series.map((s) => (_indexNormalize(s.name), s)));
-
-    _channelById
-      ..clear()
-      ..addAll({for (final c in pl.channels) c.id: c});
-    _movieById
-      ..clear()
-      ..addAll({for (final m in pl.movies) m.id: m});
-    _seriesById
-      ..clear()
-      ..addAll({for (final s in pl.series) s.id: s});
-
+  Future<void> _buildIndicesAsync(Playlist pl) async {
+    _isIndexing = true;
+    notifyListeners();
+    
+    final result = await compute(_backgroundIndexBuilder, pl);
+    
+    _channelNameIndex.clear();
+    _channelNameIndex.addAll(result.channelNameIndex);
+    _movieNameIndex.clear();
+    _movieNameIndex.addAll(result.movieNameIndex);
+    _seriesNameIndex.clear();
+    _seriesNameIndex.addAll(result.seriesNameIndex);
+    
+    _channelById.clear();
+    _channelById.addAll(result.channelById);
+    _movieById.clear();
+    _movieById.addAll(result.movieById);
+    _seriesById.clear();
+    _seriesById.addAll(result.seriesById);
+    
     _channelsByCategory.clear();
-    for (final c in pl.channels) {
-      _channelsByCategory.putIfAbsent(c.group, () => []).add(c);
-    }
+    _channelsByCategory.addAll(result.channelsByCategory);
     _moviesByCategory.clear();
-    for (final m in pl.movies) {
-      _moviesByCategory.putIfAbsent(m.category, () => []).add(m);
-    }
+    _moviesByCategory.addAll(result.moviesByCategory);
     _seriesByCategory.clear();
-    for (final s in pl.series) {
-      _seriesByCategory.putIfAbsent(s.category, () => []).add(s);
-    }
+    _seriesByCategory.addAll(result.seriesByCategory);
+    
+    _isIndexing = false;
+    notifyListeners();
+    
+    dev.log('[StorageService] Search indices built in Isolate', name: 'StorageService');
+  }
 
-    dev.log(
-      '[StorageService] Search indices built in ${sw.elapsedMilliseconds}ms — '
-      'channels: ${_channelNameIndex.length}, '
-      'movies: ${_movieNameIndex.length}, '
-      'series: ${_seriesNameIndex.length}',
-      name: 'StorageService',
-    );
+  void _clearSearchIndices() {
+    _channelNameIndex.clear();
+    _movieNameIndex.clear();
+    _seriesNameIndex.clear();
+    _channelById.clear();
+    _movieById.clear();
+    _seriesById.clear();
+    _channelsByCategory.clear();
+    _moviesByCategory.clear();
+    _seriesByCategory.clear();
+    notifyListeners();
   }
 
   void _clearSearchIndices() {
@@ -592,6 +600,11 @@ class StorageService extends ChangeNotifier {
   // ── Internal serialization ──────────────────────────────────────────────────
 
   // -- History -----------------------------------------------------------------
+
+  List<HistoryEntry> getHistory() {
+    _assertInit();
+    return _loadHistoryEntries();
+  }
 
   List<HistoryEntry> _loadHistoryEntries() {
     final raw = _history.get(_historyKey);
@@ -782,4 +795,71 @@ class StorageService extends ChangeNotifier {
       watched: m['watched'] as bool? ?? false,
     );
   }
+}
+
+// ── Isolate Indexed Result ──────────────────────────────────────────────────
+
+class _IndexingResult {
+  final List<(String, Channel)> channelNameIndex;
+  final List<(String, Movie)>   movieNameIndex;
+  final List<(String, Series)>  seriesNameIndex;
+  final Map<String, Channel>    _channelById;
+  final Map<String, Movie>      _movieById;
+  final Map<String, Series>     _seriesById;
+  final Map<String, List<Channel>> channelsByCategory;
+  final Map<String, List<Movie>>   moviesByCategory;
+  final Map<String, List<Series>>  seriesByCategory;
+
+  _IndexingResult({
+    required this.channelNameIndex,
+    required this.movieNameIndex,
+    required this.seriesNameIndex,
+    required Map<String, Channel> channelById,
+    required Map<String, Movie> movieById,
+    required Map<String, Series> seriesById,
+    required this.channelsByCategory,
+    required this.moviesByCategory,
+    required this.seriesByCategory,
+  }) : _channelById = channelById,
+       _movieById = movieById,
+       _seriesById = seriesById;
+
+  Map<String, Channel> get channelById => _channelById;
+  Map<String, Movie>   get movieById => _movieById;
+  Map<String, Series>  get seriesById => _seriesById;
+}
+
+_IndexingResult _backgroundIndexBuilder(Playlist pl) {
+  final channelNameIndex = pl.channels.map((c) => (StorageService._indexNormalize(c.name), c)).toList();
+  final movieNameIndex   = pl.movies.map((m) => (StorageService._indexNormalize(m.title), m)).toList();
+  final seriesNameIndex  = pl.series.map((s) => (StorageService._indexNormalize(s.name), s)).toList();
+
+  final channelById = {for (final c in pl.channels) c.id: c};
+  final movieById   = {for (final m in pl.movies) m.id: m};
+  final seriesById  = {for (final s in pl.series) s.id: s};
+
+  final channelsByCategory = <String, List<Channel>>{};
+  for (final c in pl.channels) {
+    channelsByCategory.putIfAbsent(c.group, () => []).add(c);
+  }
+  final moviesByCategory = <String, List<Movie>>{};
+  for (final m in pl.movies) {
+    moviesByCategory.putIfAbsent(m.category, () => []).add(m);
+  }
+  final seriesByCategory = <String, List<Series>>{};
+  for (final s in pl.series) {
+    seriesByCategory.putIfAbsent(s.category, () => []).add(s);
+  }
+
+  return _IndexingResult(
+    channelNameIndex: channelNameIndex,
+    movieNameIndex: movieNameIndex,
+    seriesNameIndex: seriesNameIndex,
+    channelById: channelById,
+    movieById: movieById,
+    seriesById: seriesById,
+    channelsByCategory: channelsByCategory,
+    moviesByCategory: moviesByCategory,
+    seriesByCategory: seriesByCategory,
+  );
 }

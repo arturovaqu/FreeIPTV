@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'models/models.dart';
 import 'screens/favorites_screen.dart';
@@ -26,6 +27,7 @@ import 'utils/constants.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
 
   // Track any boot-time error so the UI can show it
   String? bootError;
