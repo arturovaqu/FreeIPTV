@@ -9,7 +9,7 @@ android {
     namespace "com.example.iptv_app"
     compileSdk 36
     // Pin the NDK used by media_kit's native libs.
-    ndkVersion "25.1.8937393"
+    ndkVersion "26.1.10909125"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -26,7 +26,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.iptv_app"
-        minSdk 21
+        minSdk 23
         targetSdk 34
         versionCode 1
         versionName "1.0.0"
