@@ -81,12 +81,18 @@ class _SeriesListScreenState extends State<SeriesListScreen>
     final playlist = widget.playlist;
     if (playlist == null) { _filtered = []; return; }
 
+    // ignore: avoid_print
+    print('[SeriesFilter] Total series en playlist: ${playlist.series.length}');
+
     // 1. Base list: all series or search results
     List<Series> result = _query.trim().isEmpty
         ? List<Series>.from(_all)
         : SearchService.instance
             .searchByType(_query, playlist, ContentType.SERIES)
             .cast<Series>();
+
+    // ignore: avoid_print
+    print('[SeriesFilter] Tras búsqueda "$_query": ${result.length}');
 
     // 2. Category filter (trim both sides so whitespace differences don't break it)
     if (_selectedCat != 'Todas') {
@@ -114,6 +120,11 @@ class _SeriesListScreenState extends State<SeriesListScreen>
     }
 
     _filtered = result;
+
+    // ignore: avoid_print
+    print('[SeriesFilter] Categorías disponibles: ${_categories}');
+    // ignore: avoid_print
+    print('[SeriesFilter] Categoría seleccionada: "$_selectedCat" → ${_filtered.length} resultados');
 
     if (!_hasFocusedOnce && _filtered.isNotEmpty) {
       _hasFocusedOnce = true;
