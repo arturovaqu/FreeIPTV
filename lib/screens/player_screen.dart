@@ -513,26 +513,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
             // ── 2. Gesture layer ──────────────────────────────────────────
             Positioned.fill(child: _buildGestureLayer()),
 
-            // ── 3. Buffering spinner ──────────────────────────────────────
-            ValueListenableBuilder<bool>(
-              valueListenable: _media.isBufferingNotifier,
-              builder: (_, isBuffering, __) {
-                if (!isBuffering || _error != null) {
-                  return const SizedBox.shrink();
-                }
-                return const Center(
-                  child: SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: Colors.white70,
-                    ),
-                  ),
-                );
-              },
-            ),
-
             // ── 4. Controls overlay ───────────────────────────────────────
             if (_error == null)
               AnimatedOpacity(
