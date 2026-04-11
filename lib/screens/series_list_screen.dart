@@ -7,9 +7,9 @@ import '../services/progress_service.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
+import '../widgets/tv_focus_manager.dart';
 import '../widgets/tv_text_field.dart';
 import 'player_screen.dart';
-import 'series_category_detail.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SeriesListScreen
@@ -25,9 +25,13 @@ class SeriesListScreen extends StatefulWidget {
 
 class _SeriesListScreenState extends State<SeriesListScreen>
     with AutomaticKeepAliveClientMixin {
-  final _catSearchCtrl = TextEditingController();
-  String _catQuery = '';
-  Map<String, List<Series>> _seriesByCategory = {};
+  final _searchCtrl   = TextEditingController();
+  final _focusManager = TvFocusManager();
+  String   _query          = '';
+  String?  _selectedCat;
+  List<Series> _filtered   = [];
+  List<String> _categories = [];
+  bool     _hasFocusedOnce = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -35,68 +39,73 @@ class _SeriesListScreenState extends State<SeriesListScreen>
   @override
   void initState() {
     super.initState();
-    _catSearchCtrl.addListener(_onCatQueryChanged);
-    _buildCategoryMap();
+    _searchCtrl.addListener(_onQueryChanged);
+    _applyFilter();
   }
 
   @override
   void didUpdateWidget(SeriesListScreen old) {
     super.didUpdateWidget(old);
     if (old.playlist?.id != widget.playlist?.id) {
-      _catQuery = '';
-      _catSearchCtrl.clear();
-      _buildCategoryMap();
+      _query           = '';
+      _selectedCat     = null;
+      _hasFocusedOnce  = false;
+      _searchCtrl.clear();
+      _applyFilter();
     }
   }
 
   @override
   void dispose() {
-    _catSearchCtrl.removeListener(_onCatQueryChanged);
-    _catSearchCtrl.dispose();
+    _searchCtrl.removeListener(_onQueryChanged);
+    _searchCtrl.dispose();
+    _focusManager.dispose();
     super.dispose();
   }
 
-  // ── Categorías ─────────────────────────────────────────────────────────────
+  // ── Filter ─────────────────────────────────────────────────────────────────
 
-  void _onCatQueryChanged() {
-    if (_catSearchCtrl.text != _catQuery) {
-      setState(() => _catQuery = _catSearchCtrl.text);
+  void _onQueryChanged() {
+    if (_searchCtrl.text != _query) {
+      setState(() {
+        _query = _searchCtrl.text;
+        _applyFilter();
+      });
     }
   }
 
-  void _buildCategoryMap() {
-    final playlist = widget.playlist;
-    if (playlist == null) {
-      setState(() => _seriesByCategory = {});
-      return;
+  void _applyFilter() {
+    final all = widget.playlist?.series ?? [];
+
+    // Build sorted category list from real series data.
+    _categories = all
+        .map((s) => s.category.trim())
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    // Category filter
+    var result = _selectedCat == null
+        ? List<Series>.from(all)
+        : all.where((s) => s.category.trim() == _selectedCat).toList();
+
+    // Text search
+    final q = _query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      result = result
+          .where((s) => s.name.toLowerCase().contains(q))
+          .toList();
     }
 
-    final map = <String, List<Series>>{};
-    for (final s in playlist.series) {
-      final cat =
-          s.category.trim().isEmpty ? 'Sin categoría' : s.category.trim();
-      map.putIfAbsent(cat, () => []).add(s);
-    }
+    _filtered = result;
 
-    // Categorías ordenadas alfabéticamente; series dentro de cada una también.
-    final sorted = Map.fromEntries(
-      map.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
-    );
-    for (final list in sorted.values) {
-      list.sort((a, b) => a.name.compareTo(b.name));
+    if (!_hasFocusedOnce && _filtered.isNotEmpty) {
+      _hasFocusedOnce = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusManager.focusFirst();
+      });
     }
-
-    setState(() => _seriesByCategory = sorted);
-  }
-
-  List<MapEntry<String, List<Series>>> get _visibleCategories {
-    if (_catQuery.trim().isEmpty) {
-      return _seriesByCategory.entries.toList();
-    }
-    final q = _catQuery.trim().toLowerCase();
-    return _seriesByCategory.entries
-        .where((e) => e.key.toLowerCase().contains(q))
-        .toList();
   }
 
   // ── "Continuar viendo" ─────────────────────────────────────────────────────
@@ -145,62 +154,107 @@ class _SeriesListScreenState extends State<SeriesListScreen>
     );
   }
 
-  // ── Category browser ───────────────────────────────────────────────────────
+  // ── "Todas" tab ────────────────────────────────────────────────────────────
 
-  Widget _buildCategoryBrowser() {
-    final cats = _visibleCategories;
-
+  Widget _buildAllSeries() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.base, AppSpacing.md, AppSpacing.base, AppSpacing.sm),
-          child: TvTextField(
-            controller: _catSearchCtrl,
-            hintText: 'Buscar categoría...',
-            prefixIcon: const Icon(Icons.search,
-                color: AppColors.textSecondary, size: 20),
-          ),
-        ),
-        if (cats.isEmpty)
-          Expanded(
-            child: _EmptyState(
-              icon: Icons.folder_off,
-              message: _catQuery.isNotEmpty
-                  ? 'Sin categorías para "$_catQuery"'
-                  : 'Sin series disponibles',
-            ),
-          )
-        else
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
-              itemCount: cats.length,
-              itemBuilder: (_, i) {
-                final entry = cats[i];
-                return _CategoryFolderTile(
-                  category:    entry.key,
-                  seriesCount: entry.value.length,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SeriesCategoryDetail(
-                        category: entry.key,
-                        series:   entry.value,
-                        onSeriesTap: (ctx, s) => showModalBottomSheet(
-                          context: ctx,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => SeriesDetailSheet(series: s),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+        _buildFilterRow(),
+        Expanded(child: _buildGrid()),
       ],
+    );
+  }
+
+  Widget _buildFilterRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.base, AppSpacing.md, AppSpacing.base, AppSpacing.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: TvTextField(
+              controller: _searchCtrl,
+              hintText: 'Buscar serie...',
+              prefixIcon: const Icon(Icons.search,
+                  color: AppColors.textSecondary, size: 20),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          _CategoryDropdown(
+            selected: _selectedCat,
+            categories: _categories,
+            onChanged: (cat) => setState(() {
+              _selectedCat = cat;
+              _applyFilter();
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGrid() {
+    if (_filtered.isEmpty) {
+      return _EmptyState(
+        icon: Icons.search_off,
+        message: _query.isNotEmpty || _selectedCat != null
+            ? 'Sin resultados'
+            : 'Sin series disponibles',
+      );
+    }
+
+    return Consumer<StorageService>(
+      builder: (context, storage, __) {
+        final device  = getDeviceInfo(context);
+        final cols    = ResponsiveGrid.getGridColumns(device);
+        final spacing = ResponsiveSpacing.getItemSpacing(device);
+
+        _focusManager.columnCount = cols;
+        _focusManager.resize(_filtered.length);
+
+        return Focus(
+          onKeyEvent: (_, e) => _focusManager.handleKey(_filtered.length, e),
+          child: GridView.builder(
+            padding: EdgeInsets.fromLTRB(
+                spacing, AppSpacing.sm, spacing, AppSpacing.xxl),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              mainAxisSpacing: spacing,
+              crossAxisSpacing: spacing,
+              childAspectRatio: 0.62,
+            ),
+            itemCount: _filtered.length,
+            itemBuilder: (_, i) {
+              final s     = _filtered[i];
+              final isFav = storage.isFavorite(s.id, ContentType.SERIES);
+              return _SeriesTile(
+                key: ValueKey(s.id),
+                series: s,
+                isFavorite: isFav,
+                focusNode: _focusManager.nodeAt(i),
+                onFocused: () => _focusManager.onItemFocused(i),
+                onTap: () => _showDetail(s),
+                onFavoriteToggle: () {
+                  if (isFav) {
+                    storage.removeFavorite(s.id, ContentType.SERIES);
+                  } else {
+                    storage.saveFavorite(s.id, ContentType.SERIES);
+                  }
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDetail(Series s) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => SeriesDetailSheet(series: s),
     );
   }
 
@@ -223,15 +277,15 @@ class _SeriesListScreenState extends State<SeriesListScreen>
             tabs: [
               Tab(icon: Icon(Icons.play_circle_outline, size: 18),
                   text: 'Continuar'),
-              Tab(icon: Icon(Icons.folder_outlined, size: 18),
-                  text: 'Categorías'),
+              Tab(icon: Icon(Icons.grid_view, size: 18),
+                  text: 'Todas'),
             ],
           ),
           Expanded(
             child: TabBarView(
               children: [
                 _buildContinueWatching(),
-                _buildCategoryBrowser(),
+                _buildAllSeries(),
               ],
             ),
           ),
@@ -242,45 +296,117 @@ class _SeriesListScreenState extends State<SeriesListScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _CategoryFolderTile — fila de categoría navegable con D-Pad
+// _CategoryDropdown
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CategoryFolderTile extends StatefulWidget {
-  final String       category;
-  final int          seriesCount;
-  final VoidCallback onTap;
+class _CategoryDropdown extends StatelessWidget {
+  final String?        selected;
+  final List<String>   categories;
+  final ValueChanged<String?> onChanged;
 
-  const _CategoryFolderTile({
-    required this.category,
-    required this.seriesCount,
-    required this.onTap,
+  const _CategoryDropdown({
+    required this.selected,
+    required this.categories,
+    required this.onChanged,
   });
 
   @override
-  State<_CategoryFolderTile> createState() => _CategoryFolderTileState();
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: AppRadius.chipRadius,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: selected,
+          dropdownColor: AppColors.surface,
+          style: AppTextStyles.bodyMedium,
+          icon: const Icon(Icons.filter_list,
+              color: AppColors.textSecondary, size: 18),
+          hint: const Text('Categoría',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          onChanged: onChanged,
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Todas', style: AppTextStyles.bodyMedium),
+            ),
+            ...categories.map(
+              (cat) => DropdownMenuItem<String?>(
+                value: cat,
+                child: Text(cat,
+                    style: AppTextStyles.bodyMedium,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _CategoryFolderTileState extends State<_CategoryFolderTile> {
-  final _focusNode = FocusNode();
+// ─────────────────────────────────────────────────────────────────────────────
+// _SeriesTile
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SeriesTile extends StatefulWidget {
+  final Series       series;
+  final bool         isFavorite;
+  final FocusNode    focusNode;
+  final VoidCallback onTap;
+  final VoidCallback onFavoriteToggle;
+  final VoidCallback onFocused;
+
+  const _SeriesTile({
+    super.key,
+    required this.series,
+    required this.isFavorite,
+    required this.focusNode,
+    required this.onTap,
+    required this.onFavoriteToggle,
+    required this.onFocused,
+  });
+
+  @override
+  State<_SeriesTile> createState() => _SeriesTileState();
+}
+
+class _SeriesTileState extends State<_SeriesTile> {
   bool _hasFocus = false;
 
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(_onFocusChange);
+    widget.focusNode.addListener(_onFocusChange);
+    _hasFocus = widget.focusNode.hasFocus;
+  }
+
+  @override
+  void didUpdateWidget(_SeriesTile old) {
+    super.didUpdateWidget(old);
+    if (old.focusNode != widget.focusNode) {
+      old.focusNode.removeListener(_onFocusChange);
+      widget.focusNode.addListener(_onFocusChange);
+      _hasFocus = widget.focusNode.hasFocus;
+    }
   }
 
   @override
   void dispose() {
-    _focusNode.removeListener(_onFocusChange);
-    _focusNode.dispose();
+    widget.focusNode.removeListener(_onFocusChange);
     super.dispose();
   }
 
   void _onFocusChange() {
     if (!mounted) return;
-    setState(() => _hasFocus = _focusNode.hasFocus);
-    if (_focusNode.hasFocus) {
+    setState(() => _hasFocus = widget.focusNode.hasFocus);
+    if (widget.focusNode.hasFocus) {
+      widget.onFocused();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Scrollable.ensureVisible(context,
@@ -295,7 +421,7 @@ class _CategoryFolderTileState extends State<_CategoryFolderTile> {
   @override
   Widget build(BuildContext context) {
     return Focus(
-      focusNode: _focusNode,
+      focusNode: widget.focusNode,
       onKeyEvent: (_, event) {
         if (event is KeyDownEvent &&
             (event.logicalKey == LogicalKeyboardKey.enter ||
@@ -305,46 +431,97 @@ class _CategoryFolderTileState extends State<_CategoryFolderTile> {
         }
         return KeyEventResult.ignored;
       },
-      child: AnimatedContainer(
-        duration: AppDurations.fast,
-        margin: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.base, vertical: 3),
-        decoration: BoxDecoration(
-          color: _hasFocus ? AppColors.cardHover : AppColors.card,
-          borderRadius: AppRadius.cardRadius,
-          border: Border.all(
-            color: _hasFocus ? AppColors.focusBorder : Colors.transparent,
-            width: 2,
-          ),
-          boxShadow: _hasFocus
-              ? [
-                  BoxShadow(
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: AppRadius.cardRadius,
+            border: Border.all(
+              color: _hasFocus ? AppColors.focusBorder : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: _hasFocus
+                ? [
+                    BoxShadow(
                       color: AppColors.focusGlow,
                       blurRadius: 12,
-                      spreadRadius: 1)
-                ]
-              : null,
-        ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.base, vertical: AppSpacing.sm),
-          leading: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.accentSeries.withValues(alpha: 0.15),
-              borderRadius: AppRadius.thumbnailRadius,
-            ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.folder_rounded,
-                color: AppColors.accentSeries, size: 28),
+                      spreadRadius: 2,
+                    )
+                  ]
+                : [],
           ),
-          title: Text(widget.category, style: AppTextStyles.bodyLarge),
-          subtitle: Text('${widget.seriesCount} series',
-              style: AppTextStyles.bodySmall),
-          trailing: const Icon(Icons.chevron_right,
-              color: AppColors.textSecondary),
-          onTap: widget.onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Poster
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(AppRadius.md)),
+                      child: _Poster(
+                          url: widget.series.poster,
+                          name: widget.series.name),
+                    ),
+                    Positioned(
+                      top: 6, right: 6,
+                      child: GestureDetector(
+                        onTap: widget.onFavoriteToggle,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.overlay,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            widget.isFavorite
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: widget.isFavorite
+                                ? AppColors.error
+                                : Colors.white70,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Info
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.series.name,
+                        style: AppTextStyles.labelLarge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Row(children: [
+                      if (widget.series.year != null) ...[
+                        Text(widget.series.year.toString(),
+                            style: AppTextStyles.bodySmall),
+                        const SizedBox(width: AppSpacing.sm),
+                      ],
+                      if (widget.series.rating != null) ...[
+                        const Icon(Icons.star,
+                            size: 12, color: AppColors.warning),
+                        const SizedBox(width: 2),
+                        Text(widget.series.rating!.toStringAsFixed(1),
+                            style: AppTextStyles.bodySmall),
+                      ],
+                    ]),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -352,7 +529,7 @@ class _CategoryFolderTileState extends State<_CategoryFolderTile> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SeriesDetailSheet  (public — también usado por SeriesCategoryDetail)
+// SeriesDetailSheet  (public — used by other screens via callback)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SeriesDetailSheet extends StatefulWidget {
