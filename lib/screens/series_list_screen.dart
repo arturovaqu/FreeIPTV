@@ -4,13 +4,12 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/progress_service.dart';
-import '../services/search_service.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import '../utils/responsive.dart';
-import '../widgets/tv_focus_manager.dart';
 import '../widgets/tv_text_field.dart';
 import 'player_screen.dart';
+import 'series_category_detail.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SeriesListScreen
@@ -26,13 +25,9 @@ class SeriesListScreen extends StatefulWidget {
 
 class _SeriesListScreenState extends State<SeriesListScreen>
     with AutomaticKeepAliveClientMixin {
-  final _searchCtrl   = TextEditingController();
-  final _focusManager = TvFocusManager();
-  String _query           = '';
-  String _selectedCat     = 'Todas';
-  int?   _selectedYear;
-  List<Series> _filtered  = [];
-  bool _hasFocusedOnce    = false;
+  final _catSearchCtrl = TextEditingController();
+  String _catQuery = '';
+  Map<String, List<Series>> _seriesByCategory = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -40,163 +35,71 @@ class _SeriesListScreenState extends State<SeriesListScreen>
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(_onQueryChanged);
-    _applyFilter();
+    _catSearchCtrl.addListener(_onCatQueryChanged);
+    _buildCategoryMap();
   }
 
   @override
   void didUpdateWidget(SeriesListScreen old) {
     super.didUpdateWidget(old);
     if (old.playlist?.id != widget.playlist?.id) {
-      _selectedCat  = 'Todas';
-      _selectedYear = null;
-      _query        = '';
-      _searchCtrl.clear();
-      _applyFilter();
+      _catQuery = '';
+      _catSearchCtrl.clear();
+      _buildCategoryMap();
     }
   }
 
   @override
   void dispose() {
-    _searchCtrl.removeListener(_onQueryChanged);
-    _searchCtrl.dispose();
-    _focusManager.dispose();
+    _catSearchCtrl.removeListener(_onCatQueryChanged);
+    _catSearchCtrl.dispose();
     super.dispose();
   }
 
-  // ── Filtering ──────────────────────────────────────────────────────────────
+  // ── Categorías ─────────────────────────────────────────────────────────────
 
-  List<Series> get _all => widget.playlist?.series ?? [];
-
-  void _onQueryChanged() {
-    if (_searchCtrl.text != _query) {
-      setState(() {
-        _query = _searchCtrl.text;
-        _applyFilter();
-      });
+  void _onCatQueryChanged() {
+    if (_catSearchCtrl.text != _catQuery) {
+      setState(() => _catQuery = _catSearchCtrl.text);
     }
   }
 
-  void _applyFilter() {
+  void _buildCategoryMap() {
     final playlist = widget.playlist;
-    if (playlist == null) { _filtered = []; return; }
-
-    // ignore: avoid_print
-    print('[SeriesFilter] Total series en playlist: ${playlist.series.length}');
-
-    // 1. Base list: all series or search results
-    List<Series> result = _query.trim().isEmpty
-        ? List<Series>.from(_all)
-        : SearchService.instance
-            .searchByType(_query, playlist, ContentType.SERIES)
-            .cast<Series>();
-
-    // ignore: avoid_print
-    print('[SeriesFilter] Tras búsqueda "$_query": ${result.length}');
-
-    // 2. Category filter (trim both sides so whitespace differences don't break it)
-    if (_selectedCat != 'Todas') {
-      final cat = _selectedCat.trim();
-      result = result
-          .where((s) => s.category.trim() == cat)
-          .toList();
-
-      // If the selected category produced no results (e.g. because the search
-      // already narrowed the list), reset to "Todas" automatically so the user
-      // is not left staring at an empty screen.
-      if (result.isEmpty) {
-        _selectedCat = 'Todas';
-        result = _query.trim().isEmpty
-            ? List<Series>.from(_all)
-            : SearchService.instance
-                .searchByType(_query, playlist, ContentType.SERIES)
-                .cast<Series>();
-      }
+    if (playlist == null) {
+      setState(() => _seriesByCategory = {});
+      return;
     }
 
-    // 3. Year filter
-    if (_selectedYear != null) {
-      result = result.where((s) => s.year == _selectedYear).toList();
+    final map = <String, List<Series>>{};
+    for (final s in playlist.series) {
+      final cat =
+          s.category.trim().isEmpty ? 'Sin categoría' : s.category.trim();
+      map.putIfAbsent(cat, () => []).add(s);
     }
 
-    _filtered = result;
-
-    // ignore: avoid_print
-    print('[SeriesFilter] Categorías disponibles: ${_categories}');
-    // ignore: avoid_print
-    print('[SeriesFilter] Categoría seleccionada: "$_selectedCat" → ${_filtered.length} resultados');
-
-    if (!_hasFocusedOnce && _filtered.isNotEmpty) {
-      _hasFocusedOnce = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusManager.focusFirst();
-      });
-    }
-  }
-
-  List<String> get _categories {
-    if (widget.playlist == null) return [];
-    return [
-      'Todas',
-      ...SearchService.instance.getCategories(ContentType.SERIES, widget.playlist!),
-    ];
-  }
-
-  List<int> get _years {
-    final years = _all.map((s) => s.year).whereType<int>().toSet().toList()
-      ..sort((a, b) => b.compareTo(a));
-    return years;
-  }
-
-  // ── Detail sheet ───────────────────────────────────────────────────────────
-
-  void _showDetail(BuildContext context, Series series) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SeriesDetailSheet(series: series),
+    // Categorías ordenadas alfabéticamente; series dentro de cada una también.
+    final sorted = Map.fromEntries(
+      map.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
     );
-  }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    if (widget.playlist == null) {
-      return _EmptyState(
-          icon: Icons.video_library,
-          message: 'Agrega una playlist para ver series');
+    for (final list in sorted.values) {
+      list.sort((a, b) => a.name.compareTo(b.name));
     }
 
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.play_circle_outline, size: 18),
-                  text: 'Continuar'),
-              Tab(icon: Icon(Icons.video_library_outlined, size: 18),
-                  text: 'Todas'),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildContinueWatching(),
-                Column(children: [
-                  _buildFilterRow(),
-                  Expanded(child: _buildGrid()),
-                ]),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    setState(() => _seriesByCategory = sorted);
   }
+
+  List<MapEntry<String, List<Series>>> get _visibleCategories {
+    if (_catQuery.trim().isEmpty) {
+      return _seriesByCategory.entries.toList();
+    }
+    final q = _catQuery.trim().toLowerCase();
+    return _seriesByCategory.entries
+        .where((e) => e.key.toLowerCase().contains(q))
+        .toList();
+  }
+
+  // ── "Continuar viendo" ─────────────────────────────────────────────────────
 
   Widget _buildContinueWatching() {
     return Consumer<ProgressService>(
@@ -216,8 +119,8 @@ class _SeriesListScreenState extends State<SeriesListScreen>
               vertical: AppSpacing.sm, horizontal: AppSpacing.base),
           itemCount: entries.length,
           itemBuilder: (_, i) => _ContinueCard(
-            entry:  entries[i],
-            onTap:  () => _resumeEpisode(entries[i]),
+            entry: entries[i],
+            onTap: () => _resumeEpisode(entries[i]),
           ),
         );
       },
@@ -242,170 +145,148 @@ class _SeriesListScreenState extends State<SeriesListScreen>
     );
   }
 
-  // ── Filter row ─────────────────────────────────────────────────────────────
+  // ── Category browser ───────────────────────────────────────────────────────
 
-  Widget _buildFilterRow() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.base, AppSpacing.md, AppSpacing.base, AppSpacing.sm),
-      child: Row(
-        children: [
-          // Category dropdown
-          _FilterDropdown<String>(
-            value: _selectedCat,
-            items: _categories,
-            labelFor: (c) => c,
-            onChanged: (v) => setState(() { _selectedCat = v; _applyFilter(); }),
+  Widget _buildCategoryBrowser() {
+    final cats = _visibleCategories;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.base, AppSpacing.md, AppSpacing.base, AppSpacing.sm),
+          child: TvTextField(
+            controller: _catSearchCtrl,
+            hintText: 'Buscar categoría...',
+            prefixIcon: const Icon(Icons.search,
+                color: AppColors.textSecondary, size: 20),
           ),
-          const SizedBox(width: AppSpacing.sm),
-
-          // Search field (flexible)
+        ),
+        if (cats.isEmpty)
           Expanded(
-            child: TvTextField(
-              controller: _searchCtrl,
-              hintText: 'Buscar serie...',
-              prefixIcon: const Icon(Icons.search,
-                  color: AppColors.textSecondary, size: 20),
+            child: _EmptyState(
+              icon: Icons.folder_off,
+              message: _catQuery.isNotEmpty
+                  ? 'Sin categorías para "$_catQuery"'
+                  : 'Sin series disponibles',
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+              itemCount: cats.length,
+              itemBuilder: (_, i) {
+                final entry = cats[i];
+                return _CategoryFolderTile(
+                  category:    entry.key,
+                  seriesCount: entry.value.length,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SeriesCategoryDetail(
+                        category: entry.key,
+                        series:   entry.value,
+                        onSeriesTap: (ctx, s) => showModalBottomSheet(
+                          context: ctx,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => SeriesDetailSheet(series: s),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
+      ],
+    );
+  }
 
-          // Year dropdown
-          _FilterDropdown<int?>(
-            value: _selectedYear,
-            items: [null, ..._years],
-            labelFor: (y) => y == null ? 'Año' : y.toString(),
-            onChanged: (v) => setState(() { _selectedYear = v; _applyFilter(); }),
+  // ── Build ──────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (widget.playlist == null) {
+      return _EmptyState(
+          icon: Icons.video_library,
+          message: 'Agrega una playlist para ver series');
+    }
+
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.play_circle_outline, size: 18),
+                  text: 'Continuar'),
+              Tab(icon: Icon(Icons.folder_outlined, size: 18),
+                  text: 'Categorías'),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildContinueWatching(),
+                _buildCategoryBrowser(),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  // ── Grid ───────────────────────────────────────────────────────────────────
-
-  Widget _buildGrid() {
-    if (_filtered.isEmpty) {
-      return _EmptyState(
-        icon: Icons.search_off,
-        message: _query.isNotEmpty
-            ? 'Sin resultados para "$_query"'
-            : 'Sin series en esta categoría',
-      );
-    }
-
-    return Consumer<StorageService>(
-      builder: (context, storage, __) {
-        final device  = getDeviceInfo(context);
-        final cols    = ResponsiveGrid.getGridColumns(device);
-        final spacing = ResponsiveSpacing.getItemSpacing(device);
-
-        _focusManager.columnCount = cols;
-        _focusManager.resize(_filtered.length);
-
-        return Focus(
-          onKeyEvent: (_, e) => _focusManager.handleKey(_filtered.length, e),
-          child: GridView.builder(
-            padding: EdgeInsets.fromLTRB(spacing, AppSpacing.sm, spacing, AppSpacing.xxl),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: cols,
-              mainAxisSpacing: spacing,
-              crossAxisSpacing: spacing,
-              childAspectRatio: 0.62,
-            ),
-            itemCount: _filtered.length,
-            itemBuilder: (_, i) {
-              final s = _filtered[i];
-              final isFav = storage.isFavorite(s.id, ContentType.SERIES);
-              return _SeriesTile(
-                key: ValueKey(s.id),
-                series: s,
-                isFavorite: isFav,
-                focusNode: _focusManager.nodeAt(i),
-                onFocused: () => _focusManager.onItemFocused(i),
-                onTap: () => _showDetail(context, s),
-                onFavoriteToggle: () {
-                  if (isFav) {
-                    storage.removeFavorite(s.id, ContentType.SERIES);
-                  } else {
-                    storage.saveFavorite(s.id, ContentType.SERIES);
-                  }
-                },
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _SeriesTile — tarjeta con foco gestionado por TvFocusManager
+// _CategoryFolderTile — fila de categoría navegable con D-Pad
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SeriesTile extends StatefulWidget {
-  final Series       series;
-  final bool         isFavorite;
-  final FocusNode    focusNode;
+class _CategoryFolderTile extends StatefulWidget {
+  final String       category;
+  final int          seriesCount;
   final VoidCallback onTap;
-  final VoidCallback onFavoriteToggle;
-  final VoidCallback onFocused;
 
-  const _SeriesTile({
-    super.key,
-    required this.series,
-    required this.isFavorite,
-    required this.focusNode,
+  const _CategoryFolderTile({
+    required this.category,
+    required this.seriesCount,
     required this.onTap,
-    required this.onFavoriteToggle,
-    required this.onFocused,
   });
 
   @override
-  State<_SeriesTile> createState() => _SeriesTileState();
+  State<_CategoryFolderTile> createState() => _CategoryFolderTileState();
 }
 
-class _SeriesTileState extends State<_SeriesTile> {
+class _CategoryFolderTileState extends State<_CategoryFolderTile> {
+  final _focusNode = FocusNode();
   bool _hasFocus = false;
 
   @override
   void initState() {
     super.initState();
-    widget.focusNode.addListener(_onFocusChange);
-    _hasFocus = widget.focusNode.hasFocus;
-  }
-
-  @override
-  void didUpdateWidget(_SeriesTile old) {
-    super.didUpdateWidget(old);
-    if (old.focusNode != widget.focusNode) {
-      old.focusNode.removeListener(_onFocusChange);
-      widget.focusNode.addListener(_onFocusChange);
-      _hasFocus = widget.focusNode.hasFocus;
-    }
+    _focusNode.addListener(_onFocusChange);
   }
 
   @override
   void dispose() {
-    widget.focusNode.removeListener(_onFocusChange);
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
     super.dispose();
   }
 
   void _onFocusChange() {
     if (!mounted) return;
-    setState(() => _hasFocus = widget.focusNode.hasFocus);
-    if (widget.focusNode.hasFocus) {
-      widget.onFocused();
+    setState(() => _hasFocus = _focusNode.hasFocus);
+    if (_focusNode.hasFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          Scrollable.ensureVisible(
-            context,
-            alignment: 0.5,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-          );
+          Scrollable.ensureVisible(context,
+              alignment: 0.5,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut);
         }
       });
     }
@@ -414,7 +295,7 @@ class _SeriesTileState extends State<_SeriesTile> {
   @override
   Widget build(BuildContext context) {
     return Focus(
-      focusNode: widget.focusNode,
+      focusNode: _focusNode,
       onKeyEvent: (_, event) {
         if (event is KeyDownEvent &&
             (event.logicalKey == LogicalKeyboardKey.enter ||
@@ -424,96 +305,46 @@ class _SeriesTileState extends State<_SeriesTile> {
         }
         return KeyEventResult.ignored;
       },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: AppDurations.fast,
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: AppRadius.cardRadius,
-            border: Border.all(
-              color: _hasFocus ? AppColors.focusBorder : Colors.transparent,
-              width: 2,
-            ),
-            boxShadow: _hasFocus
-                ? [
-                    BoxShadow(
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.base, vertical: 3),
+        decoration: BoxDecoration(
+          color: _hasFocus ? AppColors.cardHover : AppColors.card,
+          borderRadius: AppRadius.cardRadius,
+          border: Border.all(
+            color: _hasFocus ? AppColors.focusBorder : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: _hasFocus
+              ? [
+                  BoxShadow(
                       color: AppColors.focusGlow,
                       blurRadius: 12,
-                      spreadRadius: 2,
-                    )
-                  ]
-                : [],
+                      spreadRadius: 1)
+                ]
+              : null,
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.base, vertical: AppSpacing.sm),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.accentSeries.withValues(alpha: 0.15),
+              borderRadius: AppRadius.thumbnailRadius,
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.folder_rounded,
+                color: AppColors.accentSeries, size: 28),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Poster
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(AppRadius.md)),
-                      child: _Poster(url: widget.series.poster, name: widget.series.name),
-                    ),
-                    // Favorite button overlay
-                    Positioned(
-                      top: 6, right: 6,
-                      child: GestureDetector(
-                        onTap: widget.onFavoriteToggle,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: AppColors.overlay,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            widget.isFavorite
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            color: widget.isFavorite
-                                ? AppColors.error
-                                : Colors.white70,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Info
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(widget.series.name,
-                        style: AppTextStyles.labelLarge,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
-                    Row(children: [
-                      if (widget.series.year != null) ...[
-                        Text(widget.series.year.toString(),
-                            style: AppTextStyles.bodySmall),
-                        const SizedBox(width: AppSpacing.sm),
-                      ],
-                      if (widget.series.rating != null) ...[
-                        const Icon(Icons.star,
-                            size: 12, color: AppColors.warning),
-                        const SizedBox(width: 2),
-                        Text(widget.series.rating!.toStringAsFixed(1),
-                            style: AppTextStyles.bodySmall),
-                      ],
-                    ]),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          title: Text(widget.category, style: AppTextStyles.bodyLarge),
+          subtitle: Text('${widget.seriesCount} series',
+              style: AppTextStyles.bodySmall),
+          trailing: const Icon(Icons.chevron_right,
+              color: AppColors.textSecondary),
+          onTap: widget.onTap,
         ),
       ),
     );
@@ -521,7 +352,7 @@ class _SeriesTileState extends State<_SeriesTile> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SeriesDetailSheet  (public — also used by SearchScreen)
+// SeriesDetailSheet  (public — también usado por SeriesCategoryDetail)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SeriesDetailSheet extends StatefulWidget {
@@ -533,19 +364,18 @@ class SeriesDetailSheet extends StatefulWidget {
 }
 
 class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
-  late final Set<int> _expanded; // season numbers expanded by default
+  late final Set<int> _expanded;
 
   @override
   void initState() {
     super.initState();
-    // Auto-expand season 1 (or the only season)
     _expanded = widget.series.seasons.isNotEmpty
         ? {widget.series.seasons.first.seasonNumber}
         : {};
   }
 
   void _playEpisode(Season season, Episode episode) {
-    Navigator.pop(context); // close sheet first
+    Navigator.pop(context);
 
     final episodeId =
         '${widget.series.id}_S${season.seasonNumber}E${episode.episodeNumber}';
@@ -605,21 +435,16 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
   Widget _buildHeader(BuildContext context, Series series) {
     return Stack(
       children: [
-        // Blurred backdrop
         SizedBox(
           height: 200,
           width: double.infinity,
           child: ClipRRect(
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(20)),
-            child: _Poster(
-              url: series.poster,
-              name: series.name,
-              fit: BoxFit.cover,
-            ),
+            child: _Poster(url: series.poster, name: series.name,
+                fit: BoxFit.cover),
           ),
         ),
-        // Gradient overlay
         Container(
           height: 200,
           decoration: BoxDecoration(
@@ -628,15 +453,11 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Colors.transparent,
-                AppColors.surface,
-              ],
+              colors: [Colors.transparent, AppColors.surface],
               stops: const [0.3, 1.0],
             ),
           ),
         ),
-        // Drag handle
         Positioned(
           top: 10,
           left: 0, right: 0,
@@ -650,7 +471,6 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
             ),
           ),
         ),
-        // Close
         Positioned(
           top: 8, right: 8,
           child: IconButton(
@@ -661,7 +481,6 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
             ),
           ),
         ),
-        // Favorite (bottom-right of header)
         Positioned(
           bottom: 12, right: 16,
           child: Consumer<StorageService>(
@@ -732,7 +551,6 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis),
           ],
-          // Watch progress
           if (series.totalEpisodes > 0) ...[
             const SizedBox(height: AppSpacing.md),
             Row(children: [
@@ -742,7 +560,8 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
                   child: LinearProgressIndicator(
                     value: series.watchProgress,
                     backgroundColor: AppColors.border,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.accentSeries),
+                    valueColor: const AlwaysStoppedAnimation(
+                        AppColors.accentSeries),
                     minHeight: 4,
                   ),
                 ),
@@ -771,21 +590,15 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
             style: AppTextStyles.bodyMedium),
       );
     }
-
     return Column(
-      children: series.seasons
-          .map((season) => _buildSeasonTile(season))
-          .toList(),
+      children: series.seasons.map(_buildSeasonTile).toList(),
     );
   }
 
   Widget _buildSeasonTile(Season season) {
     final isExpanded = _expanded.contains(season.seasonNumber);
-
     return Theme(
-      data: Theme.of(context).copyWith(
-        dividerColor: AppColors.border,
-      ),
+      data: Theme.of(context).copyWith(dividerColor: AppColors.border),
       child: ExpansionTile(
         initiallyExpanded: isExpanded,
         onExpansionChanged: (open) {
@@ -806,16 +619,12 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
             borderRadius: AppRadius.thumbnailRadius,
           ),
           alignment: Alignment.center,
-          child: Text(
-            'T${season.seasonNumber}',
-            style: AppTextStyles.labelLarge
-                .copyWith(color: AppColors.accentSeries),
-          ),
+          child: Text('T${season.seasonNumber}',
+              style: AppTextStyles.labelLarge
+                  .copyWith(color: AppColors.accentSeries)),
         ),
-        title: Text(
-          'Temporada ${season.seasonNumber}',
-          style: AppTextStyles.bodyLarge,
-        ),
+        title: Text('Temporada ${season.seasonNumber}',
+            style: AppTextStyles.bodyLarge),
         subtitle: Text(
           '${season.episodes.length} episodios · '
           '${season.watchedCount} vistos',
@@ -832,15 +641,14 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
 
   Widget _buildEpisodeTile(Season season, Episode episode) {
     final watched = _isWatched(season, episode);
-
     return Padding(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm, vertical: 2),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.base, vertical: AppSpacing.sm),
-        shape: RoundedRectangleBorder(
-            borderRadius: AppRadius.thumbnailRadius),
+        shape:
+            RoundedRectangleBorder(borderRadius: AppRadius.thumbnailRadius),
         tileColor: AppColors.card,
         leading: CircleAvatar(
           radius: 20,
@@ -848,19 +656,14 @@ class _SeriesDetailSheetState extends State<SeriesDetailSheet> {
               ? AppColors.success.withValues(alpha: 0.15)
               : AppColors.surfaceVariant,
           child: watched
-              ? const Icon(Icons.check,
-                  color: AppColors.success, size: 18)
-              : Text(
-                  episode.episodeNumber.toString(),
-                  style: AppTextStyles.labelLarge,
-                ),
+              ? const Icon(Icons.check, color: AppColors.success, size: 18)
+              : Text(episode.episodeNumber.toString(),
+                  style: AppTextStyles.labelLarge),
         ),
-        title: Text(
-          episode.title,
-          style: AppTextStyles.bodyLarge,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(episode.title,
+            style: AppTextStyles.bodyLarge,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis),
         subtitle: episode.duration != null
             ? Text(_formatDuration(episode.duration!),
                 style: AppTextStyles.bodySmall)
@@ -908,11 +711,8 @@ class _Poster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (url != null && url!.isNotEmpty) {
-      return Image.network(
-        url!,
-        fit: fit,
-        errorBuilder: (_, __, ___) => _PosterFallback(name: name),
-      );
+      return Image.network(url!, fit: fit,
+          errorBuilder: (_, __, ___) => _PosterFallback(name: name));
     }
     return _PosterFallback(name: name);
   }
@@ -934,14 +734,13 @@ class _PosterFallback extends StatelessWidget {
               color: AppColors.textDisabled, size: 40),
           const SizedBox(height: AppSpacing.sm),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-            child: Text(
-              name,
-              style: AppTextStyles.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
+            padding:
+                const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            child: Text(name,
+                style: AppTextStyles.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center),
           ),
         ],
       ),
@@ -982,52 +781,6 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
-class _FilterDropdown<T> extends StatelessWidget {
-  final T           value;
-  final List<T>     items;
-  final String Function(T) labelFor;
-  final ValueChanged<T> onChanged;
-
-  const _FilterDropdown({
-    required this.value,
-    required this.items,
-    required this.labelFor,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: AppRadius.buttonRadius,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          dropdownColor: AppColors.card,
-          style: AppTextStyles.bodyMedium,
-          isDense: true,
-          icon: const Icon(Icons.arrow_drop_down,
-              color: AppColors.textSecondary),
-          items: items.map((item) => DropdownMenuItem<T>(
-            value: item,
-            child: Text(labelFor(item), style: AppTextStyles.bodyMedium),
-          )).toList(),
-          onChanged: (v) { if (v != null || null is T) onChanged(v as T); },
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// _ContinueCard  — "Continuar viendo" row card for series episodes
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _ContinueCard extends StatelessWidget {
   final WatchEntry   entry;
   final VoidCallback onTap;
@@ -1050,7 +803,6 @@ class _ContinueCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.sm),
           child: Row(
             children: [
-              // Poster
               ClipRRect(
                 borderRadius: AppRadius.thumbnailRadius,
                 child: SizedBox(
@@ -1063,7 +815,6 @@ class _ContinueCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1102,8 +853,7 @@ class _ContinueCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              // Play button
-              Icon(Icons.play_circle_fill,
+              const Icon(Icons.play_circle_fill,
                   color: AppColors.accentSeries, size: 40),
             ],
           ),
