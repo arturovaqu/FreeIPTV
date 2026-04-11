@@ -294,15 +294,29 @@ class MediaService extends ChangeNotifier {
           _position = pos;
           positionNotifier.value = pos;
           _lastPositionAdvance = DateTime.now();
+
+          // Position is advancing → stream is actually playing.
+          // ExoPlayer sometimes leaves isBuffering=true even after recovery
+          // (known HLS live bug). Position advancement is the ground truth:
+          // if it moves, we are playing — force-clear spinner and all timers.
+          if (isBufferingNotifier.value) {
+            isBufferingNotifier.value = false;
+            _spinnerDebounceTimer?.cancel();
+            _spinnerDebounceTimer = null;
+            _seekTimeoutTimer?.cancel();
+            _seekTimeoutTimer = null;
+            _cancelBufferingWatchdog();
+            dev.log('[MediaService] Position advancing — forced buffering clear',
+                name: 'MediaService');
+          }
         } else if (_currentContentType == ContentType.TV &&
-            ctrl.value.isPlaying &&
-            !isBufferingNotifier.value) {
-          // Live TV silent stall: position not advancing despite isPlaying=true
-          // and no buffering reported — ExoPlayer got stuck silently.
+            ctrl.value.isPlaying) {
+          // Live TV: position not advancing despite isPlaying=true.
+          // Catches both buffering-reported and silent stalls.
           final stuck = DateTime.now().difference(_lastPositionAdvance);
           if (stuck.inSeconds >= 8) {
             dev.log(
-                '[MediaService] Silent stall ${stuck.inSeconds}s — restarting',
+                '[MediaService] Stall ${stuck.inSeconds}s — restarting',
                 name: 'MediaService');
             _lastPositionAdvance = DateTime.now(); // prevent repeated restarts
             await _restartCurrentStream();
@@ -326,8 +340,8 @@ class MediaService extends ChangeNotifier {
   void _startBufferingWatchdog() {
     _bufferingWatchdogTimer?.cancel();
     final timeout = _currentContentType == ContentType.TV
-        ? const Duration(seconds: 6)
-        : const Duration(seconds: 15);
+        ? const Duration(seconds: 12)
+        : const Duration(seconds: 20);
     _bufferingWatchdogTimer = Timer(timeout, () async {
       if (!isBufferingNotifier.value) return; // Already recovered.
       dev.log('[MediaService] Buffering watchdog fired — restarting stream',
