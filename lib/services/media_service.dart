@@ -339,10 +339,18 @@ class MediaService extends ChangeNotifier {
 
   void _startBufferingWatchdog() {
     _bufferingWatchdogTimer?.cancel();
-    final timeout = _currentContentType == ContentType.TV
-        ? const Duration(seconds: 12)
-        : const Duration(seconds: 20);
-    _bufferingWatchdogTimer = Timer(timeout, () async {
+    // Only restart on buffering for live TV. Live streams should recover in
+    // seconds; if they don't, reconnecting is cheap.
+    //
+    // VOD (movies / series) intentionally has NO watchdog:
+    //   - MP4 movies may legitimately buffer for >20 s before first frame.
+    //   - HLS series segments buffer quickly on their own.
+    //   - The position-poll already force-clears the spinner the moment the
+    //     position advances, so no watchdog is needed for VOD.
+    //   - A watchdog for VOD would restart the stream in a loop and prevent
+    //     movies from ever starting (the original bug).
+    if (_currentContentType != ContentType.TV) return;
+    _bufferingWatchdogTimer = Timer(const Duration(seconds: 12), () async {
       if (!isBufferingNotifier.value) return; // Already recovered.
       dev.log('[MediaService] Buffering watchdog fired — restarting stream',
           name: 'MediaService');
