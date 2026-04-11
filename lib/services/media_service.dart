@@ -22,7 +22,10 @@ class MediaService extends ChangeNotifier {
   Timer?                 _progressTimer;
   Timer?                 _positionPollTimer;
   Timer?                 _seekTimeoutTimer;
+  Timer?                 _bufferingWatchdogTimer;
+  Timer?                 _spinnerDebounceTimer;
   int                    _openGeneration  = 0;
+  DateTime               _lastPositionAdvance = DateTime.now();
 
   // ── State ───────────────────────────────────────────────────────────────────
 
@@ -116,6 +119,9 @@ class MediaService extends ChangeNotifier {
     _cancelPositionPollTimer();
     _seekTimeoutTimer?.cancel();
     _seekTimeoutTimer = null;
+    _cancelBufferingWatchdog();
+    _spinnerDebounceTimer?.cancel();
+    _spinnerDebounceTimer = null;
     _clearError();
     completedNotifier.value   = false;
     isBufferingNotifier.value = true;
@@ -215,13 +221,33 @@ class MediaService extends ChangeNotifier {
     }
 
     // Buffering
-    if (isBufferingNotifier.value != val.isBuffering) {
-      isBufferingNotifier.value = val.isBuffering;
-      if (!val.isBuffering) {
-        // Seek completed — cancel the safety timeout.
-        _seekTimeoutTimer?.cancel();
-        _seekTimeoutTimer = null;
+    if (val.isBuffering && !isBufferingNotifier.value) {
+      // Buffering started.
+      // Live TV: debounce 1.5 s so brief recoveries don't flash the spinner.
+      // VOD:     show immediately (seek already set it explicitly).
+      if (_currentContentType == ContentType.TV) {
+        _spinnerDebounceTimer?.cancel();
+        _spinnerDebounceTimer = Timer(
+          const Duration(milliseconds: 1500),
+          () {
+            if (_controller?.value.isBuffering == true) {
+              isBufferingNotifier.value = true;
+            }
+          },
+        );
+      } else {
+        isBufferingNotifier.value = true;
       }
+      _startBufferingWatchdog();
+    } else if (!val.isBuffering) {
+      // Buffering cleared — cancel debounce so spinner never shows for
+      // brief events, and cancel all safety timers.
+      _spinnerDebounceTimer?.cancel();
+      _spinnerDebounceTimer = null;
+      isBufferingNotifier.value = false;
+      _seekTimeoutTimer?.cancel();
+      _seekTimeoutTimer = null;
+      _cancelBufferingWatchdog();
     }
 
     // Error
@@ -257,15 +283,30 @@ class MediaService extends ChangeNotifier {
 
   void _startPositionPollTimer() {
     _cancelPositionPollTimer();
+    _lastPositionAdvance = DateTime.now();
     _positionPollTimer = Timer.periodic(
       const Duration(milliseconds: 500),
-      (_) {
+      (_) async {
         final ctrl = _controller;
         if (ctrl == null || !ctrl.value.isInitialized) return;
         final pos = ctrl.value.position;
         if (_position != pos) {
           _position = pos;
           positionNotifier.value = pos;
+          _lastPositionAdvance = DateTime.now();
+        } else if (_currentContentType == ContentType.TV &&
+            ctrl.value.isPlaying &&
+            !isBufferingNotifier.value) {
+          // Live TV silent stall: position not advancing despite isPlaying=true
+          // and no buffering reported — ExoPlayer got stuck silently.
+          final stuck = DateTime.now().difference(_lastPositionAdvance);
+          if (stuck.inSeconds >= 8) {
+            dev.log(
+                '[MediaService] Silent stall ${stuck.inSeconds}s — restarting',
+                name: 'MediaService');
+            _lastPositionAdvance = DateTime.now(); // prevent repeated restarts
+            await _restartCurrentStream();
+          }
         }
       },
     );
@@ -274,6 +315,49 @@ class MediaService extends ChangeNotifier {
   void _cancelPositionPollTimer() {
     _positionPollTimer?.cancel();
     _positionPollTimer = null;
+  }
+
+  // ── Buffering watchdog ────────────────────────────────────────────────────────
+  //
+  // Restarts the stream if ExoPlayer stays buffering without recovering.
+  // Live TV: 6 s timeout (streams rarely need more to recover).
+  // VOD:     15 s timeout (seek + buffering can take longer on slow servers).
+
+  void _startBufferingWatchdog() {
+    _bufferingWatchdogTimer?.cancel();
+    final timeout = _currentContentType == ContentType.TV
+        ? const Duration(seconds: 6)
+        : const Duration(seconds: 15);
+    _bufferingWatchdogTimer = Timer(timeout, () async {
+      if (!isBufferingNotifier.value) return; // Already recovered.
+      dev.log('[MediaService] Buffering watchdog fired — restarting stream',
+          name: 'MediaService');
+      await _restartCurrentStream();
+    });
+  }
+
+  void _cancelBufferingWatchdog() {
+    _bufferingWatchdogTimer?.cancel();
+    _bufferingWatchdogTimer = null;
+  }
+
+  /// Reopens the current content URL from scratch.
+  /// For VOD, attempts to restore the playback position after reconnect.
+  Future<void> _restartCurrentStream() async {
+    final type     = _currentContentType;
+    final savedPos = _position;
+    String? url;
+    if (type == ContentType.TV)     url = _currentChannel?.url;
+    if (type == ContentType.SERIES) url = _currentEpisode?.url;
+    if (type == ContentType.MOVIES) url = _currentMovie?.url;
+    if (url == null) return;
+
+    await _openUrl(url);
+
+    // Restore VOD position after reconnect (not needed for live streams).
+    if (type != ContentType.TV && savedPos > const Duration(seconds: 2)) {
+      await seek(savedPos);
+    }
   }
 
   // ── Playback commands ────────────────────────────────────────────────────────
@@ -588,6 +672,9 @@ class MediaService extends ChangeNotifier {
     _saveCurrentProgress();
     _cancelProgressTimer();
     _cancelPositionPollTimer();
+    _seekTimeoutTimer?.cancel();
+    _cancelBufferingWatchdog();
+    _spinnerDebounceTimer?.cancel();
 
     _controller?.removeListener(_onControllerUpdate);
     _controller?.dispose();
