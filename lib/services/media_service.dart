@@ -143,7 +143,7 @@ class MediaService extends ChangeNotifier {
     try {
       if (_mediaKitPlayer == null) {
         _mediaKitPlayer = Player();
-        _mediaKitVideoController = await VideoController.create(_mediaKitPlayer!);
+        _mediaKitVideoController = VideoController(_mediaKitPlayer!);
         
         // Listeners for Pro Engine
         _mediaKitPlayer!.stream.playing.listen((v) => isPlayingNotifier.value = v);
@@ -191,6 +191,14 @@ class MediaService extends ChangeNotifier {
     } catch (e) {
       _handleError('Error Pro: $e');
     }
+  }
+
+  void _handleError(String error) {
+    _error = error;
+    errorNotifier.value = error;
+    isPlayingNotifier.value = false;
+    isBufferingNotifier.value = false;
+    dev.log('[MediaService] ERROR: $error', name: 'MediaService');
   }
 
   Future<void> _openUrlStd(String safeUrl) async {
@@ -484,11 +492,13 @@ class MediaService extends ChangeNotifier {
     try {
       if (_mediaKitPlayer != null) {
         await _mediaKitPlayer!.stop();
-      } else if (_controller != null) {
-        await _controller!.pause();
-        await _controller!.seekTo(Duration.zero);
       }
-  Future<void> seekTo(Duration position) async {
+    } catch (e) {
+      dev.log('[MediaService] Stop error: $e', name: 'MediaService');
+    }
+  }
+
+  Future<void> seek(Duration position) async {
     try {
       if (_mediaKitPlayer != null) {
         await _mediaKitPlayer!.seek(position);

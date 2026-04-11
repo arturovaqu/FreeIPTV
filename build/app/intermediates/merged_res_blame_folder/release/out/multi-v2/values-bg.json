@@ -1,27 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.iptv_app-mergeReleaseResources-33:/values-bg/values-bg.xml",
+            "outputFile": "com.example.iptv_app-mergeReleaseResources-39:/values-bg/values-bg.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\444794a88e2932f3c7c3d1208623a6d0\\transformed\\media3-exoplayer-1.4.1\\res\\values-bg\\values-bg.xml",
-                    "from": {
-                        "startLines": "2,3,4,5,6,7,8,9,10",
-                        "startColumns": "4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "55,126,189,253,327,405,478,575,666",
-                        "endColumns": "70,62,63,73,77,72,96,90,75",
-                        "endOffsets": "121,184,248,322,400,473,570,661,737"
-                    },
-                    "to": {
-                        "startLines": "27,28,29,30,31,32,33,34,35",
-                        "startColumns": "4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "3103,3174,3237,3301,3375,3453,3526,3623,3714",
-                        "endColumns": "70,62,63,73,77,72,96,90,75",
-                        "endOffsets": "3169,3232,3296,3370,3448,3521,3618,3709,3785"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\b6aa4778a98117731fa42f3eadd73a91\\transformed\\play-services-base-18.1.0\\res\\values-bg\\values.xml",
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\1a79be08735cc66a494cd2d30ebe6e00\\transformed\\play-services-base-18.1.0\\res\\values-bg\\values.xml",
                     "from": {
                         "startLines": "4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
                         "startColumns": "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
@@ -38,24 +21,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\79ea11f45ade5d8d5a01474519c63868\\transformed\\play-services-basement-18.1.0\\res\\values-bg\\values.xml",
-                    "from": {
-                        "startLines": "4",
-                        "startColumns": "0",
-                        "startOffsets": "195",
-                        "endColumns": "133",
-                        "endOffsets": "328"
-                    },
-                    "to": {
-                        "startLines": "17",
-                        "startColumns": "4",
-                        "startOffsets": "1846",
-                        "endColumns": "137",
-                        "endOffsets": "1979"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\7e61c05e97a673198d3d0677174a8085\\transformed\\core-1.13.1\\res\\values-bg\\values-bg.xml",
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\14ff39097eb08b27d5f83bed45a930af\\transformed\\core-1.13.1\\res\\values-bg\\values-bg.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -69,6 +35,40 @@
                         "startOffsets": "55,152,262,364,465,572,677,3790",
                         "endColumns": "96,109,101,100,106,104,118,100",
                         "endOffsets": "147,257,359,460,567,672,791,3886"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\288c209a232f7294144c177c1bf32055\\transformed\\media3-exoplayer-1.4.1\\res\\values-bg\\values-bg.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,126,189,253,327,405,478,575,666",
+                        "endColumns": "70,62,63,73,77,72,96,90,75",
+                        "endOffsets": "121,184,248,322,400,473,570,661,737"
+                    },
+                    "to": {
+                        "startLines": "27,28,29,30,31,32,33,34,35",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "3103,3174,3237,3301,3375,3453,3526,3623,3714",
+                        "endColumns": "70,62,63,73,77,72,96,90,75",
+                        "endOffsets": "3169,3232,3296,3370,3448,3521,3618,3709,3785"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\7e3477d41f9ed55c6ec009b021fe6b8f\\transformed\\play-services-basement-18.1.0\\res\\values-bg\\values.xml",
+                    "from": {
+                        "startLines": "4",
+                        "startColumns": "0",
+                        "startOffsets": "195",
+                        "endColumns": "133",
+                        "endOffsets": "328"
+                    },
+                    "to": {
+                        "startLines": "17",
+                        "startColumns": "4",
+                        "startOffsets": "1846",
+                        "endColumns": "137",
+                        "endOffsets": "1979"
                     }
                 }
             ]

@@ -1,27 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.iptv_app-mergeReleaseResources-33:/values-pt/values-pt.xml",
+            "outputFile": "com.example.iptv_app-mergeReleaseResources-39:/values-pt/values-pt.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\7e61c05e97a673198d3d0677174a8085\\transformed\\core-1.13.1\\res\\values-pt\\values-pt.xml",
-                    "from": {
-                        "startLines": "2,3,4,5,6,7,8,9",
-                        "startColumns": "4,4,4,4,4,4,4,4",
-                        "startOffsets": "55,152,254,353,453,560,670,790",
-                        "endColumns": "96,101,98,99,106,109,119,100",
-                        "endOffsets": "147,249,348,448,555,665,785,886"
-                    },
-                    "to": {
-                        "startLines": "2,3,4,5,6,7,8,18",
-                        "startColumns": "4,4,4,4,4,4,4,4",
-                        "startOffsets": "55,152,254,353,453,560,670,1476",
-                        "endColumns": "96,101,98,99,106,109,119,100",
-                        "endOffsets": "147,249,348,448,555,665,785,1572"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\444794a88e2932f3c7c3d1208623a6d0\\transformed\\media3-exoplayer-1.4.1\\res\\values-pt\\values-pt.xml",
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\288c209a232f7294144c177c1bf32055\\transformed\\media3-exoplayer-1.4.1\\res\\values-pt\\values-pt.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10",
                         "startColumns": "4,4,4,4,4,4,4,4,4",
@@ -35,6 +18,23 @@
                         "startOffsets": "790,860,930,1002,1068,1145,1212,1313,1406",
                         "endColumns": "69,69,71,65,76,66,100,92,69",
                         "endOffsets": "855,925,997,1063,1140,1207,1308,1401,1471"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\14ff39097eb08b27d5f83bed45a930af\\transformed\\core-1.13.1\\res\\values-pt\\values-pt.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,152,254,353,453,560,670,790",
+                        "endColumns": "96,101,98,99,106,109,119,100",
+                        "endOffsets": "147,249,348,448,555,665,785,886"
+                    },
+                    "to": {
+                        "startLines": "2,3,4,5,6,7,8,18",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,152,254,353,453,560,670,1476",
+                        "endColumns": "96,101,98,99,106,109,119,100",
+                        "endOffsets": "147,249,348,448,555,665,785,1572"
                     }
                 }
             ]

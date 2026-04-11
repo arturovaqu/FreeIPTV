@@ -62,7 +62,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
+        <!--
+        Service for holding metadata. Cannot be instantiated.
+        Metadata will be merged from other manifests.
+        -->
         <service
             android:name="androidx.camera.core.impl.MetadataHolderService"
             android:enabled="false"

@@ -95,12 +95,12 @@ class DashboardScreen extends StatelessWidget {
 
   void _playChannel(BuildContext context, Channel channel) {
     MediaService.instance.playChannel(channel);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerScreen()));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen.channel(channel: channel)));
   }
 
   void _playMovie(BuildContext context, Movie movie) {
     MediaService.instance.playMovie(movie);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerScreen()));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen.movie(movie: movie)));
   }
 }
 

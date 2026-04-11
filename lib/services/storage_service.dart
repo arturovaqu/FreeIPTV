@@ -229,7 +229,7 @@ class StorageService extends ChangeNotifier {
     _playlistCache[playlist.id] = playlist; // keep cache in sync
     // Rebuild search indices if this is the currently-active playlist
     final activeId = _settings.get('activePlaylistId') as String?;
-    if (activeId == playlist.id) _createSearchIndices(playlist);
+    if (activeId == playlist.id) _buildIndicesAsync(playlist);
     dev.log('[StorageService] savePlaylist() ${sw.elapsedMilliseconds}ms: ${playlist.name}',
         name: 'StorageService');
     notifyListeners();
@@ -272,6 +272,8 @@ class StorageService extends ChangeNotifier {
     final activeId = _settings.get('activePlaylistId') as String?;
     if (activeId == null) return null;
     if (_playlistCache.containsKey(activeId)) return _playlistCache[activeId];
+    final raw = _settings.get(activeId);
+    if (raw == null) return null;
     final sw = Stopwatch()..start();
     final pl = _decodePlaylist(raw as Map);
     _playlistCache[activeId] = pl;
@@ -302,7 +304,7 @@ class StorageService extends ChangeNotifier {
     await _settings.put('activePlaylistId', id);
     // Rebuild indices for the newly-active playlist (may already be in cache)
     final pl = _playlistCache[id];
-    if (pl != null) _createSearchIndices(pl);
+    if (pl != null) _buildIndicesAsync(pl);
     dev.log('[StorageService] Active playlist set to: $id',
         name: 'StorageService');
     notifyListeners();
@@ -537,18 +539,6 @@ class StorageService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _clearSearchIndices() {
-    _channelNameIndex.clear();
-    _movieNameIndex.clear();
-    _seriesNameIndex.clear();
-    _channelById.clear();
-    _movieById.clear();
-    _seriesById.clear();
-    _channelsByCategory.clear();
-    _moviesByCategory.clear();
-    _seriesByCategory.clear();
-  }
-
   // ── Public fast-search API ───────────────────────────────────────────────────
 
   /// Substring search over channels. Returns all channels if [query] is empty.
@@ -600,11 +590,6 @@ class StorageService extends ChangeNotifier {
   // ── Internal serialization ──────────────────────────────────────────────────
 
   // -- History -----------------------------------------------------------------
-
-  List<HistoryEntry> getHistory() {
-    _assertInit();
-    return _loadHistoryEntries();
-  }
 
   List<HistoryEntry> _loadHistoryEntries() {
     final raw = _history.get(_historyKey);

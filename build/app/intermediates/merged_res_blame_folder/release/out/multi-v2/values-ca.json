@@ -1,44 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.iptv_app-mergeReleaseResources-33:/values-ca/values-ca.xml",
+            "outputFile": "com.example.iptv_app-mergeReleaseResources-39:/values-ca/values-ca.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\79ea11f45ade5d8d5a01474519c63868\\transformed\\play-services-basement-18.1.0\\res\\values-ca\\values.xml",
-                    "from": {
-                        "startLines": "4",
-                        "startColumns": "0",
-                        "startOffsets": "195",
-                        "endColumns": "130",
-                        "endOffsets": "325"
-                    },
-                    "to": {
-                        "startLines": "17",
-                        "startColumns": "4",
-                        "startOffsets": "1787",
-                        "endColumns": "134",
-                        "endOffsets": "1917"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\444794a88e2932f3c7c3d1208623a6d0\\transformed\\media3-exoplayer-1.4.1\\res\\values-ca\\values-ca.xml",
-                    "from": {
-                        "startLines": "2,3,4,5,6,7,8,9,10",
-                        "startColumns": "4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "55,133,192,261,331,407,483,581,676",
-                        "endColumns": "77,58,68,69,75,75,97,94,81",
-                        "endOffsets": "128,187,256,326,402,478,576,671,753"
-                    },
-                    "to": {
-                        "startLines": "27,28,29,30,31,32,33,34,35",
-                        "startColumns": "4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "3034,3112,3171,3240,3310,3386,3462,3560,3655",
-                        "endColumns": "77,58,68,69,75,75,97,94,81",
-                        "endOffsets": "3107,3166,3235,3305,3381,3457,3555,3650,3732"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\7e61c05e97a673198d3d0677174a8085\\transformed\\core-1.13.1\\res\\values-ca\\values-ca.xml",
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\14ff39097eb08b27d5f83bed45a930af\\transformed\\core-1.13.1\\res\\values-ca\\values-ca.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -55,7 +21,41 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\b6aa4778a98117731fa42f3eadd73a91\\transformed\\play-services-base-18.1.0\\res\\values-ca\\values.xml",
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\288c209a232f7294144c177c1bf32055\\transformed\\media3-exoplayer-1.4.1\\res\\values-ca\\values-ca.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,133,192,261,331,407,483,581,676",
+                        "endColumns": "77,58,68,69,75,75,97,94,81",
+                        "endOffsets": "128,187,256,326,402,478,576,671,753"
+                    },
+                    "to": {
+                        "startLines": "27,28,29,30,31,32,33,34,35",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "3034,3112,3171,3240,3310,3386,3462,3560,3655",
+                        "endColumns": "77,58,68,69,75,75,97,94,81",
+                        "endOffsets": "3107,3166,3235,3305,3381,3457,3555,3650,3732"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\7e3477d41f9ed55c6ec009b021fe6b8f\\transformed\\play-services-basement-18.1.0\\res\\values-ca\\values.xml",
+                    "from": {
+                        "startLines": "4",
+                        "startColumns": "0",
+                        "startOffsets": "195",
+                        "endColumns": "130",
+                        "endOffsets": "325"
+                    },
+                    "to": {
+                        "startLines": "17",
+                        "startColumns": "4",
+                        "startOffsets": "1787",
+                        "endColumns": "134",
+                        "endOffsets": "1917"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\1a79be08735cc66a494cd2d30ebe6e00\\transformed\\play-services-base-18.1.0\\res\\values-ca\\values.xml",
                     "from": {
                         "startLines": "4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
                         "startColumns": "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",

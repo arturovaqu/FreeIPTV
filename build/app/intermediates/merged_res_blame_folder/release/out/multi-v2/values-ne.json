@@ -1,10 +1,27 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.iptv_app-mergeReleaseResources-33:/values-ne/values-ne.xml",
+            "outputFile": "com.example.iptv_app-mergeReleaseResources-39:/values-ne/values-ne.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\b6aa4778a98117731fa42f3eadd73a91\\transformed\\play-services-base-18.1.0\\res\\values-ne\\values.xml",
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\288c209a232f7294144c177c1bf32055\\transformed\\media3-exoplayer-1.4.1\\res\\values-ne\\values-ne.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,126,197,267,334,412,489,589,683",
+                        "endColumns": "70,70,69,66,77,76,99,93,68",
+                        "endOffsets": "121,192,262,329,407,484,584,678,747"
+                    },
+                    "to": {
+                        "startLines": "27,28,29,30,31,32,33,34,35",
+                        "startColumns": "4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "3102,3173,3244,3314,3381,3459,3536,3636,3730",
+                        "endColumns": "70,70,69,66,77,76,99,93,68",
+                        "endOffsets": "3168,3239,3309,3376,3454,3531,3631,3725,3794"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\1a79be08735cc66a494cd2d30ebe6e00\\transformed\\play-services-base-18.1.0\\res\\values-ne\\values.xml",
                     "from": {
                         "startLines": "4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
                         "startColumns": "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
@@ -21,24 +38,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\79ea11f45ade5d8d5a01474519c63868\\transformed\\play-services-basement-18.1.0\\res\\values-ne\\values.xml",
-                    "from": {
-                        "startLines": "4",
-                        "startColumns": "0",
-                        "startOffsets": "195",
-                        "endColumns": "159",
-                        "endOffsets": "354"
-                    },
-                    "to": {
-                        "startLines": "17",
-                        "startColumns": "4",
-                        "startOffsets": "1817",
-                        "endColumns": "163",
-                        "endOffsets": "1976"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\7e61c05e97a673198d3d0677174a8085\\transformed\\core-1.13.1\\res\\values-ne\\values-ne.xml",
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\14ff39097eb08b27d5f83bed45a930af\\transformed\\core-1.13.1\\res\\values-ne\\values-ne.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -55,20 +55,20 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\444794a88e2932f3c7c3d1208623a6d0\\transformed\\media3-exoplayer-1.4.1\\res\\values-ne\\values-ne.xml",
+                    "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\7e3477d41f9ed55c6ec009b021fe6b8f\\transformed\\play-services-basement-18.1.0\\res\\values-ne\\values.xml",
                     "from": {
-                        "startLines": "2,3,4,5,6,7,8,9,10",
-                        "startColumns": "4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "55,126,197,267,334,412,489,589,683",
-                        "endColumns": "70,70,69,66,77,76,99,93,68",
-                        "endOffsets": "121,192,262,329,407,484,584,678,747"
+                        "startLines": "4",
+                        "startColumns": "0",
+                        "startOffsets": "195",
+                        "endColumns": "159",
+                        "endOffsets": "354"
                     },
                     "to": {
-                        "startLines": "27,28,29,30,31,32,33,34,35",
-                        "startColumns": "4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "3102,3173,3244,3314,3381,3459,3536,3636,3730",
-                        "endColumns": "70,70,69,66,77,76,99,93,68",
-                        "endOffsets": "3168,3239,3309,3376,3454,3531,3631,3725,3794"
+                        "startLines": "17",
+                        "startColumns": "4",
+                        "startOffsets": "1817",
+                        "endColumns": "163",
+                        "endOffsets": "1976"
                     }
                 }
             ]

@@ -13,12 +13,6 @@ dart_tool/
 # Build output — ignore everything EXCEPT the release APK
 # ─────────────────────────────────────────────────────────────────────────────
 build/
-
-# Re-include the release APK so it can be distributed via the repo
-!build/
-!build/app/
-!build/app/outputs/
-!build/app/outputs/flutter-apk/
 !build/app/outputs/flutter-apk/app-release.apk
 !build/app/outputs/flutter-apk/app-release.apk.sha1
 
