@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/models.dart';
 import '../services/media_service.dart';
@@ -147,6 +148,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     _enterImmersive();
     _startPlayback();
     _setupListeners();
@@ -156,6 +158,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
+    WakelockPlus.disable();
     _savePosition();
     _media.stop(); // stop playback so audio doesn't continue after navigation
     _hideTimer?.cancel();

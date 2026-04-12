@@ -350,7 +350,7 @@ class MediaService extends ChangeNotifier {
     //   - A watchdog for VOD would restart the stream in a loop and prevent
     //     movies from ever starting (the original bug).
     if (_currentContentType != ContentType.TV) return;
-    _bufferingWatchdogTimer = Timer(const Duration(seconds: 12), () async {
+    _bufferingWatchdogTimer = Timer(const Duration(seconds: 8), () async {
       if (!isBufferingNotifier.value) return; // Already recovered.
       dev.log('[MediaService] Buffering watchdog fired — restarting stream',
           name: 'MediaService');

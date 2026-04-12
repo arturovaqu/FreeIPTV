@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
@@ -138,7 +139,7 @@ class M3UParser {
         '[M3UParser] Downloaded ${response.contentLength ?? response.bodyBytes.length} bytes',
         name: 'M3UParser',
       );
-      return response.body;
+      return utf8.decode(response.bodyBytes, allowMalformed: true);
     } on M3UFetchException {
       rethrow;
     } catch (e) {
