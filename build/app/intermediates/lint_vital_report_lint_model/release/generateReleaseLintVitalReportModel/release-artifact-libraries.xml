@@ -4,11 +4,17 @@
       jars="D:\PERSONAL\Dinero\IPTV\build\app\intermediates\flutter\release\libs.jar"
       resolved="__local_aars__:D:\PERSONAL\Dinero\IPTV\build\app\intermediates\flutter\release\libs.jar:unspecified"/>
   <library
+      name=":@@:package_info_plus::release"
+      project=":package_info_plus"/>
+  <library
       name=":@@:path_provider_android::release"
       project=":path_provider_android"/>
   <library
       name=":@@:video_player_android::release"
       project=":video_player_android"/>
+  <library
+      name=":@@:wakelock_plus::release"
+      project=":wakelock_plus"/>
   <library
       name="io.flutter:flutter_embedding_release:1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5@jar"
       jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\io.flutter\flutter_embedding_release\1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5\f6c43158f9203a219312bd674ff9bb50413a0003\flutter_embedding_release-1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5.jar"
@@ -310,9 +316,9 @@
       jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib-jdk7\1.8.20\3aa51faf20aae8b31e1a4bc54f8370673d7b7df4\kotlin-stdlib-jdk7-1.8.20.jar"
       resolved="org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20"/>
   <library
-      name="org.jetbrains.kotlin:kotlin-stdlib:2.1.0@jar"
-      jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib\2.1.0\85f8b81009cda5890e54ba67d64b5e599c645020\kotlin-stdlib-2.1.0.jar"
-      resolved="org.jetbrains.kotlin:kotlin-stdlib:2.1.0"/>
+      name="org.jetbrains.kotlin:kotlin-stdlib:2.2.0@jar"
+      jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib\2.2.0\fdfc65fbc42fda253a26f61dac3c0aca335fae96\kotlin-stdlib-2.2.0.jar"
+      resolved="org.jetbrains.kotlin:kotlin-stdlib:2.2.0"/>
   <library
       name="io.flutter:armeabi_v7a_release:1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5@jar"
       jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\io.flutter\armeabi_v7a_release\1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5\b04f61064f7dd1113039047e4f9a1514a8475cfc\armeabi_v7a_release-1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5.jar"

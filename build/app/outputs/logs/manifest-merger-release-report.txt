@@ -34,8 +34,11 @@ ADDED from D:\PERSONAL\Dinero\IPTV\android\app\src\main\AndroidManifest.xml:2:1-
 INJECTED from D:\PERSONAL\Dinero\IPTV\android\app\src\main\AndroidManifest.xml:2:1-43:12
 INJECTED from D:\PERSONAL\Dinero\IPTV\android\app\src\main\AndroidManifest.xml:2:1-43:12
 INJECTED from D:\PERSONAL\Dinero\IPTV\android\app\src\main\AndroidManifest.xml:2:1-43:12
+MERGED from [:wakelock_plus] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\wakelock_plus-1.4.0\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:2:1-7:12
+MERGED from [:package_info_plus] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\package_info_plus-9.0.1\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:2:1-7:12
 MERGED from [:path_provider_android] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.17\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:2:1-7:12
 MERGED from [:video_player_android] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\video_player_android-2.8.4\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.fragment:fragment:1.7.1] C:\Users\artur\.gradle\caches\transforms-3\b062de17ce0099372eecc61e619ec0bc\transformed\fragment-1.7.1\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.media3:media3-extractor:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\aed4990e1d074d74f02835561e91543b\transformed\media3-extractor-1.4.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.media3:media3-container:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\6dfca7e5f466afafdcd4913c11302b54\transformed\media3-container-1.4.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.media3:media3-datasource:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\b4fa10dc7590109140f4c8c750ee48da\transformed\media3-datasource-1.4.1\AndroidManifest.xml:17:1-22:12
@@ -47,7 +50,6 @@ MERGED from [androidx.media3:media3-exoplayer-dash:1.4.1] C:\Users\artur\.gradle
 MERGED from [androidx.media3:media3-exoplayer-rtsp:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\e986ccde79edc4593b853fe8159764a5\transformed\media3-exoplayer-rtsp-1.4.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.media3:media3-exoplayer-smoothstreaming:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\e72de87e2e83b7476ed1d48fe4ba04f8\transformed\media3-exoplayer-smoothstreaming-1.4.1\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.media3:media3-exoplayer:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\444794a88e2932f3c7c3d1208623a6d0\transformed\media3-exoplayer-1.4.1\AndroidManifest.xml:17:1-24:12
-MERGED from [androidx.fragment:fragment:1.7.1] C:\Users\artur\.gradle\caches\transforms-3\b062de17ce0099372eecc61e619ec0bc\transformed\fragment-1.7.1\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.window:window:1.2.0] C:\Users\artur\.gradle\caches\transforms-3\b4b2e551cb953ad6ebd8412a939bdad2\transformed\window-1.2.0\AndroidManifest.xml:17:1-31:12
 MERGED from [androidx.window:window-java:1.2.0] C:\Users\artur\.gradle\caches\transforms-3\7300fd420f17005243c984cc4b7a0f1b\transformed\window-java-1.2.0\AndroidManifest.xml:17:1-21:12
 MERGED from [androidx.activity:activity:1.8.1] C:\Users\artur\.gradle\caches\transforms-3\066d25a47d55b1ab616dddb36b779fa4\transformed\activity-1.8.1\AndroidManifest.xml:17:1-22:12
@@ -142,10 +144,16 @@ uses-sdk
 INJECTED from D:\PERSONAL\Dinero\IPTV\android\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from D:\PERSONAL\Dinero\IPTV\android\app\src\main\AndroidManifest.xml
 INJECTED from D:\PERSONAL\Dinero\IPTV\android\app\src\main\AndroidManifest.xml
+MERGED from [:wakelock_plus] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\wakelock_plus-1.4.0\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:5:5-44
+MERGED from [:wakelock_plus] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\wakelock_plus-1.4.0\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:5:5-44
+MERGED from [:package_info_plus] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\package_info_plus-9.0.1\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:5:5-44
+MERGED from [:package_info_plus] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\package_info_plus-9.0.1\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:5:5-44
 MERGED from [:path_provider_android] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.17\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:5:5-44
 MERGED from [:path_provider_android] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.17\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:5:5-44
 MERGED from [:video_player_android] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\video_player_android-2.8.4\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:5:5-44
 MERGED from [:video_player_android] C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\video_player_android-2.8.4\android\build\intermediates\merged_manifest\release\AndroidManifest.xml:5:5-44
+MERGED from [androidx.fragment:fragment:1.7.1] C:\Users\artur\.gradle\caches\transforms-3\b062de17ce0099372eecc61e619ec0bc\transformed\fragment-1.7.1\AndroidManifest.xml:5:5-44
+MERGED from [androidx.fragment:fragment:1.7.1] C:\Users\artur\.gradle\caches\transforms-3\b062de17ce0099372eecc61e619ec0bc\transformed\fragment-1.7.1\AndroidManifest.xml:5:5-44
 MERGED from [androidx.media3:media3-extractor:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\aed4990e1d074d74f02835561e91543b\transformed\media3-extractor-1.4.1\AndroidManifest.xml:20:5-44
 MERGED from [androidx.media3:media3-extractor:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\aed4990e1d074d74f02835561e91543b\transformed\media3-extractor-1.4.1\AndroidManifest.xml:20:5-44
 MERGED from [androidx.media3:media3-container:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\6dfca7e5f466afafdcd4913c11302b54\transformed\media3-container-1.4.1\AndroidManifest.xml:20:5-44
@@ -168,8 +176,6 @@ MERGED from [androidx.media3:media3-exoplayer-smoothstreaming:1.4.1] C:\Users\ar
 MERGED from [androidx.media3:media3-exoplayer-smoothstreaming:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\e72de87e2e83b7476ed1d48fe4ba04f8\transformed\media3-exoplayer-smoothstreaming-1.4.1\AndroidManifest.xml:20:5-44
 MERGED from [androidx.media3:media3-exoplayer:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\444794a88e2932f3c7c3d1208623a6d0\transformed\media3-exoplayer-1.4.1\AndroidManifest.xml:20:5-44
 MERGED from [androidx.media3:media3-exoplayer:1.4.1] C:\Users\artur\.gradle\caches\transforms-3\444794a88e2932f3c7c3d1208623a6d0\transformed\media3-exoplayer-1.4.1\AndroidManifest.xml:20:5-44
-MERGED from [androidx.fragment:fragment:1.7.1] C:\Users\artur\.gradle\caches\transforms-3\b062de17ce0099372eecc61e619ec0bc\transformed\fragment-1.7.1\AndroidManifest.xml:5:5-44
-MERGED from [androidx.fragment:fragment:1.7.1] C:\Users\artur\.gradle\caches\transforms-3\b062de17ce0099372eecc61e619ec0bc\transformed\fragment-1.7.1\AndroidManifest.xml:5:5-44
 MERGED from [androidx.window:window:1.2.0] C:\Users\artur\.gradle\caches\transforms-3\b4b2e551cb953ad6ebd8412a939bdad2\transformed\window-1.2.0\AndroidManifest.xml:20:5-44
 MERGED from [androidx.window:window:1.2.0] C:\Users\artur\.gradle\caches\transforms-3\b4b2e551cb953ad6ebd8412a939bdad2\transformed\window-1.2.0\AndroidManifest.xml:20:5-44
 MERGED from [androidx.window:window-java:1.2.0] C:\Users\artur\.gradle\caches\transforms-3\7300fd420f17005243c984cc4b7a0f1b\transformed\window-java-1.2.0\AndroidManifest.xml:19:5-44

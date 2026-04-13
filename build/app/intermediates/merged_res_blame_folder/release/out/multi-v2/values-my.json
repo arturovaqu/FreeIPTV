@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.iptv_app-mergeReleaseResources-27:/values-my/values-my.xml",
+            "outputFile": "com.example.iptv_app-mergeReleaseResources-29:/values-my/values-my.xml",
             "map": [
                 {
                     "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\7e61c05e97a673198d3d0677174a8085\\transformed\\core-1.13.1\\res\\values-my\\values-my.xml",

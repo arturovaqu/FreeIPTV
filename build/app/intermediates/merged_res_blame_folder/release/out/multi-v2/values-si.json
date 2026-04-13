@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.iptv_app-mergeReleaseResources-27:/values-si/values-si.xml",
+            "outputFile": "com.example.iptv_app-mergeReleaseResources-29:/values-si/values-si.xml",
             "map": [
                 {
                     "source": "C:\\Users\\artur\\.gradle\\caches\\transforms-3\\444794a88e2932f3c7c3d1208623a6d0\\transformed\\media3-exoplayer-1.4.1\\res\\values-si\\values-si.xml",

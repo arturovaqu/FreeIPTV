@@ -356,43 +356,11 @@ class M3UParser {
   ///   codes and meta-tokens, return the best genre token or `'Series'`
   /// - Otherwise → the trimmed group-title as-is (it's a genre label)
   static String _deriveSeriesCategory(String group, String seriesName) {
-    final g     = group.trim();
-    final sLow  = seriesName.trim().toLowerCase();
-
-    // 1. Empty → generic bucket
+    final g = group.trim();
     if (g.isEmpty) return 'Series';
-
-    // 2. Exact series-name match (case-insensitive) → not a genre
-    if (g.toLowerCase() == sLow) return 'Series';
-
-    // 3. Pipe-separated format: e.g. "ES | SERIES | Drama" or "Series | Acción"
-    if (g.contains('|')) {
-      final parts = g
-          .split('|')
-          .map((p) => p.trim())
-          .where((p) => p.isNotEmpty)
-          .toList();
-
-      final genre = parts.lastWhere(
-        (p) {
-          final low = p.toLowerCase();
-          // Skip: equals the series name
-          if (low == sLow) return false;
-          // Skip: generic "series/serie" labels
-          if (low == 'series' || low == 'serie' || low == 'tvshow') return false;
-          // Skip: language/country codes (1–3 uppercase letters)
-          if (RegExp(r'^[A-Z]{1,3}$').hasMatch(p)) return false;
-          return true;
-        },
-        orElse: () => '',
-      );
-
-      return genre.isNotEmpty ? genre : 'Series';
-    }
-
-    // 4. Group-title contains the series name as a substring → not a genre
-    if (g.toLowerCase().contains(sLow) && sLow.length > 4) return 'Series';
-
+    
+    // Use the explicit group-title provided by the playlist.
+    // This allows categories like "ES| SERIES DE NETFLIX" to appear intact.
     return g;
   }
 

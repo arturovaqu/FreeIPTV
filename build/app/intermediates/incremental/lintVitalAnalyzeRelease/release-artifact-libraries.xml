@@ -4,6 +4,19 @@
       jars="D:\PERSONAL\Dinero\IPTV\build\app\intermediates\flutter\release\libs.jar"
       resolved="__local_aars__:D:\PERSONAL\Dinero\IPTV\build\app\intermediates\flutter\release\libs.jar:unspecified"/>
   <library
+      name=":@@:package_info_plus::release"
+      jars="C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\package_info_plus-9.0.1\android\build\.transforms\bba512c7b24335a3c195096e896966bf\transformed\out\jars\classes.jar;C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\package_info_plus-9.0.1\android\build\.transforms\bba512c7b24335a3c195096e896966bf\transformed\out\jars\libs\R.jar"
+      resolved="dev.fluttercommunity.plus.packageinfo:package_info_plus:unspecified"
+      folder="C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\package_info_plus-9.0.1\android\build\.transforms\bba512c7b24335a3c195096e896966bf\transformed\out"
+      manifest="AndroidManifest.xml"
+      resFolder="res"
+      assetsFolder="assets"
+      lintJar="lint.jar"
+      publicResources="public.txt"
+      symbolFile="R.txt"
+      externalAnnotations="annotations.zip"
+      proguardRules="proguard.txt"/>
+  <library
       name=":@@:path_provider_android::release"
       jars="C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.17\android\build\.transforms\287a0bb997f80d92218f81aa4d1643d9\transformed\out\jars\classes.jar;C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.17\android\build\.transforms\287a0bb997f80d92218f81aa4d1643d9\transformed\out\jars\libs\R.jar"
       resolved="io.flutter.plugins.pathprovider:path_provider_android:unspecified"
@@ -21,6 +34,19 @@
       jars="C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\video_player_android-2.8.4\android\build\.transforms\0d474aa28b6db8cee019c474be72243f\transformed\out\jars\classes.jar;C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\video_player_android-2.8.4\android\build\.transforms\0d474aa28b6db8cee019c474be72243f\transformed\out\jars\libs\R.jar"
       resolved="io.flutter.plugins.videoplayer:video_player_android:unspecified"
       folder="C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\video_player_android-2.8.4\android\build\.transforms\0d474aa28b6db8cee019c474be72243f\transformed\out"
+      manifest="AndroidManifest.xml"
+      resFolder="res"
+      assetsFolder="assets"
+      lintJar="lint.jar"
+      publicResources="public.txt"
+      symbolFile="R.txt"
+      externalAnnotations="annotations.zip"
+      proguardRules="proguard.txt"/>
+  <library
+      name=":@@:wakelock_plus::release"
+      jars="C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\wakelock_plus-1.4.0\android\build\.transforms\ead2907b25e46dc6505d4f91cc272ab5\transformed\out\jars\classes.jar;C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\wakelock_plus-1.4.0\android\build\.transforms\ead2907b25e46dc6505d4f91cc272ab5\transformed\out\jars\libs\R.jar"
+      resolved="dev.fluttercommunity.plus.wakelock:wakelock_plus:unspecified"
+      folder="C:\Users\artur\AppData\Local\Pub\Cache\hosted\pub.dev\wakelock_plus-1.4.0\android\build\.transforms\ead2907b25e46dc6505d4f91cc272ab5\transformed\out"
       manifest="AndroidManifest.xml"
       resFolder="res"
       assetsFolder="assets"
@@ -330,9 +356,9 @@
       jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib-jdk7\1.8.20\3aa51faf20aae8b31e1a4bc54f8370673d7b7df4\kotlin-stdlib-jdk7-1.8.20.jar"
       resolved="org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20"/>
   <library
-      name="org.jetbrains.kotlin:kotlin-stdlib:2.1.0@jar"
-      jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib\2.1.0\85f8b81009cda5890e54ba67d64b5e599c645020\kotlin-stdlib-2.1.0.jar"
-      resolved="org.jetbrains.kotlin:kotlin-stdlib:2.1.0"/>
+      name="org.jetbrains.kotlin:kotlin-stdlib:2.2.0@jar"
+      jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib\2.2.0\fdfc65fbc42fda253a26f61dac3c0aca335fae96\kotlin-stdlib-2.2.0.jar"
+      resolved="org.jetbrains.kotlin:kotlin-stdlib:2.2.0"/>
   <library
       name="io.flutter:armeabi_v7a_release:1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5@jar"
       jars="C:\Users\artur\.gradle\caches\modules-2\files-2.1\io.flutter\armeabi_v7a_release\1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5\b04f61064f7dd1113039047e4f9a1514a8475cfc\armeabi_v7a_release-1.0.0-82bd5b7209295a5b7ff8cae0df96e7870171e3a5.jar"
